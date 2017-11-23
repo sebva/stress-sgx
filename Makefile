@@ -24,6 +24,9 @@ VERSION=0.09.03
 CFLAGS += -Wall -Wextra -DVERSION='"$(VERSION)"' -O2 -std=gnu99
 
 SGX_SDK ?= /opt/intel/sgxsdk
+SGX_MODE ?= HW
+SGX_DEBUG ?= 1
+SGX_PRERELEASE ?= 0
 
 #
 # Pedantic flags
@@ -310,7 +313,7 @@ sgx/utils.o: sgx/utils.c sgx/utils.h
 	$(CC) $(CFLAGS) -c -o $@ sgx/utils.c
 
 enclave.signed.so:
-	$(MAKE) -f sgx/Makefile SGX_MODE=HW SGX_DEBUG=1
+	$(MAKE) -f sgx/Makefile SGX_MODE=$(SGX_MODE) SGX_DEBUG=$(SGX_DEBUG) SGX_PRERELEASE=$(SGX_PRERELEASE)
 	cp --reflink=always sgx/enclave_enclave/enclave.signed.so enclave.signed.so
 
 stress-ng: sgx/utils.o enclave.signed.so $(OBJS)
@@ -375,6 +378,7 @@ pdf:
 
 .PHONY: clean
 clean:
+	$(MAKE) -f sgx/Makefile clean
 	@rm -f stress-ng $(OBJS) stress-ng.1.gz stress-ng.pdf
 	@rm -f stress-ng-$(VERSION).tar.gz
 	@rm -f personality.h
