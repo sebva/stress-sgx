@@ -182,6 +182,7 @@ STRESS_SRC = \
 	stress-sem.c \
 	stress-sem-sysv.c \
 	stress-sendfile.c \
+	stress-sgx.c \
 	stress-shm.c \
 	stress-shm-sysv.c \
 	stress-sigfd.c \
@@ -282,6 +283,7 @@ LIB_SCTP = -lsctp
 #
 -include config
 ifneq ("$(wildcard config)","")
+all: all_config
 .PHONY: all_config
 all_config:
 	$(MAKE) -f Makefile.config

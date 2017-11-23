@@ -1286,6 +1286,7 @@ typedef enum {
 	STRESS_SEMAPHORE_POSIX,
 	STRESS_SEMAPHORE_SYSV,
 	STRESS_SENDFILE,
+	STRESS_SGX,
 	STRESS_SHM_POSIX,
 	STRESS_SHM_SYSV,
 	STRESS_SIGFD,
@@ -1888,6 +1889,9 @@ typedef enum {
 	OPT_SEMAPHORE_SYSV_OPS,
 	OPT_SEMAPHORE_SYSV_PROCS,
 
+	OPT_SGX,
+	OPT_SGX_OPS,
+
 	OPT_SHM_POSIX,
 	OPT_SHM_POSIX_OPS,
 	OPT_SHM_POSIX_BYTES,
@@ -2472,6 +2476,7 @@ extern int stress_ioport_supported(void);
 extern int stress_netlink_proc_supported(void);
 extern int stress_physpage_supported(void);
 extern int stress_rdrand_supported(void);
+extern int stress_sgx_supported(void);
 extern int stress_softlockup_supported(void);
 extern int stress_swap_supported(void);
 extern int stress_tsc_supported(void);
@@ -2866,6 +2871,7 @@ STRESS(stress_seek);
 STRESS(stress_sem);
 STRESS(stress_sem_sysv);
 STRESS(stress_sendfile);
+STRESS(stress_sgx);
 STRESS(stress_shm);
 STRESS(stress_shm_sysv);
 STRESS(stress_sigfd);
