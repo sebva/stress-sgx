@@ -23,6 +23,11 @@ VERSION=0.09.03
 
 CFLAGS += -Wall -Wextra -DVERSION='"$(VERSION)"' -O2 -std=gnu99
 
+SGX_SDK ?= /opt/intel/sgxsdk
+SGX_MODE ?= HW
+SGX_DEBUG ?= 1
+SGX_PRERELEASE ?= 0
+
 #
 # Pedantic flags
 #
@@ -182,6 +187,7 @@ STRESS_SRC = \
 	stress-sem.c \
 	stress-sem-sysv.c \
 	stress-sendfile.c \
+	stress-sgx.c \
 	stress-shm.c \
 	stress-shm-sysv.c \
 	stress-sigfd.c \
@@ -282,26 +288,36 @@ LIB_SCTP = -lsctp
 #
 -include config
 ifneq ("$(wildcard config)","")
-.PHONY: all_config
+all: all_config
+.PHONY: all_config enclave.signed.so
 all_config:
 	$(MAKE) -f Makefile.config
 	$(MAKE) stress-ng
 endif
 
 CFLAGS += $(CONFIG_CFLAGS)
+CFLAGS += -I$(SGX_SDK)/include
 LDFLAGS += $(CONFIG_LDFLAGS)
+LDFLAGS += -L$(SGX_SDK)/lib64 -lsgx_urts
 OBJS += $(CONFIG_OBJS)
 
 .SUFFIXES: .c .o
 
 .o: stress-ng.h Makefile
 
-.c.o: stress-ng.h Makefile $(SRC)
+.c.o: sgx/utils.h stress-ng.h Makefile $(SRC)
 	@echo $(CC) $(CFLAGS) -c -o $@ $<
 	@$(CC) $(CFLAGS) -c -o $@ $<
 
-stress-ng: $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) -lm $(LDFLAGS) -lc -o $@
+sgx/utils.o: sgx/utils.c sgx/utils.h
+	$(CC) $(CFLAGS) -c -o $@ sgx/utils.c
+
+enclave.signed.so:
+	$(MAKE) -f sgx/Makefile SGX_MODE=$(SGX_MODE) SGX_DEBUG=$(SGX_DEBUG) SGX_PRERELEASE=$(SGX_PRERELEASE)
+	cp --reflink=always sgx/enclave_enclave/enclave.signed.so enclave.signed.so
+
+stress-ng: sgx/utils.o enclave.signed.so $(OBJS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_enclave/untrusted/enclave_u.o -lm $(LDFLAGS) -lc -o $@
 
 #
 #  generate apparmor data using minimal core utils tools from apparmor
@@ -362,6 +378,7 @@ pdf:
 
 .PHONY: clean
 clean:
+	$(MAKE) -f sgx/Makefile clean
 	@rm -f stress-ng $(OBJS) stress-ng.1.gz stress-ng.pdf
 	@rm -f stress-ng-$(VERSION).tar.gz
 	@rm -f personality.h

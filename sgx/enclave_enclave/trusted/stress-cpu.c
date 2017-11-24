@@ -1,0 +1,2341 @@
+/*
+ * Copyright (C) 2013-2017 Canonical, Ltd.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * This code is a complete clean re-write of the stress tool by
+ * Colin Ian King <colin.king@canonical.com> and attempts to be
+ * backwardly compatible with the stress tool by Amos Waterland
+ * <apw@rossby.metr.ou.edu> but has more stress tests and more
+ * functionality.
+ *
+ */
+//#include "stress-ng.h"
+#include <math.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <sys/types.h>
+
+//#include "complex.h"
+#define complex	_Complex
+#define I 1i
+double complex cexp(double complex z);
+double cabs(double complex z);
+
+#define M_PI		3.14159265358979323846	/* pi */
+#define M_E		2.7182818284590452354	/* e */
+#define FFT_SIZE		(4096)
+#define STRESS_CPU_DITHER_X	(1024)
+#define STRESS_CPU_DITHER_Y	(768)
+
+
+#define CRT_INFINITY __builtin_huge_valf()
+#define crt_isinf(x) __builtin_isinf((x))
+#define crt_isnan(x) __builtin_isnan((x))
+#define crt_copysign(x, y) __builtin_copysign((x), (y))
+double _Complex __muldc3(double __a, double __b, double __c, double __d)
+{
+    double __ac = __a * __c;
+    double __bd = __b * __d;
+    double __ad = __a * __d;
+    double __bc = __b * __c;
+    double _Complex z;
+    __real__ z = __ac - __bd;
+    __imag__ z = __ad + __bc;
+    if (crt_isnan(__real__ z) && crt_isnan(__imag__ z))
+    {
+        int __recalc = 0;
+        if (crt_isinf(__a) || crt_isinf(__b))
+        {
+            __a = crt_copysign(crt_isinf(__a) ? 1 : 0, __a);
+            __b = crt_copysign(crt_isinf(__b) ? 1 : 0, __b);
+            if (crt_isnan(__c))
+                __c = crt_copysign(0, __c);
+            if (crt_isnan(__d))
+                __d = crt_copysign(0, __d);
+            __recalc = 1;
+        }
+        if (crt_isinf(__c) || crt_isinf(__d))
+        {
+            __c = crt_copysign(crt_isinf(__c) ? 1 : 0, __c);
+            __d = crt_copysign(crt_isinf(__d) ? 1 : 0, __d);
+            if (crt_isnan(__a))
+                __a = crt_copysign(0, __a);
+            if (crt_isnan(__b))
+                __b = crt_copysign(0, __b);
+            __recalc = 1;
+        }
+        if (!__recalc && (crt_isinf(__ac) || crt_isinf(__bd) ||
+                          crt_isinf(__ad) || crt_isinf(__bc)))
+        {
+            if (crt_isnan(__a))
+                __a = crt_copysign(0, __a);
+            if (crt_isnan(__b))
+                __b = crt_copysign(0, __b);
+            if (crt_isnan(__c))
+                __c = crt_copysign(0, __c);
+            if (crt_isnan(__d))
+                __d = crt_copysign(0, __d);
+            __recalc = 1;
+        }
+        if (__recalc)
+        {
+            __real__ z = CRT_INFINITY * (__a * __c - __b * __d);
+            __imag__ z = CRT_INFINITY * (__a * __d + __b * __c);
+        }
+    }
+    return z;
+}
+
+
+typedef int pid_t;
+
+struct timeval
+{
+  long int tv_sec;              /* Seconds.  */
+  long int tv_usec;        /* Microseconds.  */
+};
+
+/* stressor args */
+typedef struct {
+	uint64_t *const counter;	/* stressor counter */
+	const char *name;		/* stressor name */
+	const uint64_t max_ops;		/* max number of bogo ops */
+	const uint32_t instance;	/* stressor instance # */
+	const uint32_t num_instances;	/* number of instances */
+	pid_t pid;			/* stressor pid */
+	pid_t ppid;			/* stressor ppid */
+	size_t page_size;		/* page size */
+} args_t;
+
+
+
+#define GAMMA 		(0.57721566490153286060651209008240243104215933593992L)
+#define OMEGA		(0.56714329040978387299996866221035554975381578718651L)
+#define PSI		(3.359885666243177553172011302918927179688905133732L)
+#define STATS_MAX	(250)
+
+
+#define STRESS_VECTOR	1
+#define CASE_FALLTHROUGH __attribute__((fallthrough)) /* Fallthrough */
+#define NORETURN 	__attribute__ ((noreturn))
+#define ALWAYS_INLINE	__attribute__ ((always_inline))
+#define NOINLINE	__attribute__ ((noinline))
+#define OPTIMIZE3 	__attribute__((optimize("-O3")))
+#define OPTIMIZE1 	__attribute__((optimize("-O1")))
+#define WARN_UNUSED	__attribute__((warn_unused_result))
+#define ALIGN128	__attribute__ ((aligned(128)))
+#define ALIGN64		__attribute__ ((aligned(64)))
+#if defined(ALIGN128)
+#define ALIGN_CACHELINE ALIGN128
+#else
+#define ALIGN_CACHELINE ALIGN64
+#endif
+
+#define HOT		__attribute__ ((hot))
+#define MLOCKED		__attribute__((__section__("mlocked")))
+#define MLOCKED_SECTION 1
+#define FORMAT(func, a, b) __attribute__((format(func, a, b)))
+#define RESTRICT __restrict
+#define LIKELY(x)	__builtin_expect((x),1)
+#define UNLIKELY(x)	__builtin_expect((x),0)
+#define SIZEOF_ARRAY(a)		(sizeof(a) / sizeof(a[0]))
+
+/* waste some cycles */
+#define FORCE_DO_NOTHING() __asm__ __volatile__("nop;")
+
+/*
+ *  externs to force gcc to stash computed values and hence
+ *  to stop the optimiser optimising code away to zero. The
+ *  *_put funcs are essentially no-op functions.
+ */
+extern uint64_t uint64_zero(void);
+
+static volatile uint64_t uint64_val;
+static volatile double   double_val;
+
+/*
+ *  uint64_put()
+ *	stash a uint64_t value
+ */
+static inline void ALWAYS_INLINE uint64_put(const uint64_t a)
+{
+	uint64_val = a;
+}
+
+/*
+ *  double_put()
+ *	stash a double value
+ */
+static inline void ALWAYS_INLINE double_put(const double a)
+{
+	double_val = a;
+}
+
+/* MWC random number initial seed */
+#define MWC_SEED_Z		(362436069UL)
+#define MWC_SEED_W		(521288629UL)
+#define MWC_SEED()		mwc_seed(MWC_SEED_W, MWC_SEED_Z)
+
+/* Fast random number generator state */
+typedef struct {
+	uint32_t w;
+	uint32_t z;
+} mwc_t;
+
+static mwc_t __mwc = {
+	MWC_SEED_W,
+	MWC_SEED_Z
+};
+
+static uint8_t mwc_n8, mwc_n16;
+
+static inline void mwc_flush(void)
+{
+	mwc_n8 = 0;
+	mwc_n16 = 0;
+}
+
+/*
+ *  mwc32()
+ *      Multiply-with-carry random numbers
+ *      fast pseudo random number generator, see
+ *      http://www.cse.yorku.ca/~oz/marsaglia-rng.html
+ */
+HOT OPTIMIZE3 uint32_t mwc32(void)
+{
+	__mwc.z = 36969 * (__mwc.z & 65535) + (__mwc.z >> 16);
+	__mwc.w = 18000 * (__mwc.w & 65535) + (__mwc.w >> 16);
+	return (__mwc.z << 16) + __mwc.w;
+}
+
+/*
+ *  mwc_reseed()
+ *	dirty mwc reseed
+ */
+void mwc_reseed(void)
+{
+	__mwc.w = MWC_SEED_W;
+	__mwc.z = MWC_SEED_Z;
+	mwc_flush();
+}
+
+/*
+ *  mwc_seed()
+ *      set mwc seeds
+ */
+void mwc_seed(const uint32_t w, const uint32_t z)
+{
+	__mwc.w = w;
+	__mwc.z = z;
+
+	mwc_flush();
+}
+
+/*
+ *  mwc64()
+ *	get a 64 bit pseudo random number
+ */
+HOT OPTIMIZE3 uint64_t mwc64(void)
+{
+	return (((uint64_t)mwc32()) << 32) | mwc32();
+}
+
+/*
+ *  mwc16()
+ *	get a 16 bit pseudo random number
+ */
+HOT OPTIMIZE3 uint16_t mwc16(void)
+{
+	static uint32_t mwc_saved;
+
+	if (mwc_n16) {
+		mwc_n16--;
+		mwc_saved >>= 16;
+	} else {
+		mwc_n16 = 1;
+		mwc_saved = mwc32();
+	}
+	return mwc_saved & 0xffff;
+}
+
+/*
+ *  mwc8()
+ *	get an 8 bit pseudo random number
+ */
+HOT OPTIMIZE3 uint8_t mwc8(void)
+{
+	static uint32_t mwc_saved;
+
+	if (LIKELY(mwc_n8)) {
+		mwc_n8--;
+		mwc_saved >>= 8;
+	} else {
+		mwc_n8 = 3;
+		mwc_saved = mwc32();
+	}
+	return mwc_saved & 0xff;
+}
+
+
+/*
+ * Some awful math lib workarounds for functions that some
+ * math libraries don't have implemented (yet)
+ */
+#if !defined(HAVE_CABSL)
+#define cabsl	cabs
+#endif
+
+#if !defined(HAVE_LGAMMAL)
+#define lgammal	lgamma
+#endif
+
+#if !defined(HAVE_CCOSL)
+#define	ccosl	ccos
+#endif
+
+#if !defined(HAVE_CSINL)
+#define	csinl	csin
+#endif
+
+#if !defined(HAVE_CPOW)
+#define cpow	pow
+#endif
+
+#if !defined(HAVE_POWL)
+#define powl	pow
+#endif
+
+#if !defined(HAVE_RINTL)
+#define rintl	rint
+#endif
+
+#if !defined(HAVE_LOGL)
+#define logl	log
+#endif
+
+#if !defined(HAVE_EXPL)
+#define expl	exp
+#endif
+
+#if !defined(HAVE_COSL)
+#define cosl	cos
+#endif
+
+#if !defined(HAVE_SINL)
+#define	sinl	sin
+#endif
+
+#if !defined(HAVE_COSHL)
+#define coshl	cosh
+#endif
+
+#if !defined(HAVE_SINHL)
+#define	sinhl	sinh
+#endif
+
+#if !defined(HAVE_SQRTL)
+#define sqrtl	sqrt
+#endif
+
+/*
+ *  the CPU stress test has different classes of cpu stressor
+ */
+typedef void (*stress_cpu_func)(const char *name);
+
+typedef struct {
+	const char		*name;	/* human readable form of stressor */
+	const stress_cpu_func	func;	/* the cpu method function */
+} stress_cpu_method_info_t;
+
+static const stress_cpu_method_info_t cpu_methods[];
+
+uint8_t pixels[STRESS_CPU_DITHER_X][STRESS_CPU_DITHER_Y];
+
+/*
+ *  stress_cpu_sqrt()
+ *	stress CPU on square roots
+ */
+static void HOT stress_cpu_sqrt(const char *name)
+{
+	int i;
+
+	for (i = 0; i < 16384; i++) {
+		uint64_t rnd = mwc32();
+		double r = sqrt((double)rnd) * sqrt((double)rnd);
+	}
+}
+
+/*
+ *  We need to stop gcc optimising out the loop additions.. sigh
+ */
+static void stress_cpu_loop(const char *)  __attribute__((optimize("-O0")));
+
+/*
+ *  stress_cpu_loop()
+ *	simple CPU busy loop
+ */
+static void stress_cpu_loop(const char *name)
+{
+	uint32_t i, i_sum = 0;
+	const uint32_t sum = 134209536UL;
+
+	for (i = 0; i < 16384; i++) {
+		i_sum += i;
+		FORCE_DO_NOTHING();
+	}
+}
+
+/*
+ *  stress_cpu_gcd()
+ *	compute Greatest Common Divisor
+ */
+static void HOT OPTIMIZE3 stress_cpu_gcd(const char *name)
+{
+	uint32_t i, i_sum = 0;
+	const uint32_t sum = 63000868UL;
+
+	for (i = 0; i < 16384; i++) {
+		register uint32_t a = i, b = i % (3 + (1997 ^ i));
+
+		while (b != 0) {
+			register uint32_t r = b;
+			b = a % b;
+			a = r;
+		}
+		i_sum += a;
+		FORCE_DO_NOTHING();
+	}
+}
+
+/*
+ *  stress_cpu_bitops()
+ *	various bit manipulation hacks from bithacks
+ *	https://graphics.stanford.edu/~seander/bithacks.html
+ */
+static void HOT OPTIMIZE3 stress_cpu_bitops(const char *name)
+{
+	uint32_t i, i_sum = 0;
+	const uint32_t sum = 0x8aadcaab;
+
+	for (i = 0; i < 16384; i++) {
+		{
+			register uint32_t r, v, s = (sizeof(v) * 8) - 1;
+
+			/* Reverse bits */
+			r = v = i;
+			for (v >>= 1; v; v >>= 1, s--) {
+				r <<= 1;
+				r |= v & 1;
+			}
+			r <<= s;
+			i_sum += r;
+		}
+		{
+			/* parity check */
+			register uint32_t v = i;
+
+			v ^= v >> 16;
+			v ^= v >> 8;
+			v ^= v >> 4;
+			v &= 0xf;
+			i_sum += v;
+		}
+		{
+			/* Brian Kernighan count bits */
+			register uint32_t j, v = i;
+
+			for (j = 0; v; j++)
+				v &= v - 1;
+			i_sum += j;
+		}
+		{
+			/* round up to nearest highest power of 2 */
+			register uint32_t v = i - 1;
+
+			v |= v >> 1;
+			v |= v >> 2;
+			v |= v >> 4;
+			v |= v >> 8;
+			v |= v >> 16;
+			i_sum += v;
+		}
+	}
+}
+
+/*
+ *  stress_cpu_trig()
+ *	simple sin, cos trig functions
+ */
+static void HOT stress_cpu_trig(const char *name)
+{
+	int i;
+	long double d_sum = 0.0L;
+
+	(void)name;
+
+	for (i = 0; i < 1500; i++) {
+		long double theta = (2.0L * M_PI * (double)i)/1500.0L;
+		{
+			d_sum += (cosl(theta) * sinl(theta));
+			d_sum += (cos(theta) * sin(theta));
+			d_sum += (cosf(theta) * sinf(theta));
+		}
+		{
+			long double theta2 = theta * 2.0L;
+
+			d_sum += cosl(theta2);
+			d_sum += cos(theta2);
+			d_sum += cosf(theta2);
+		}
+		{
+			long double theta3 = theta * 3.0L;
+
+			d_sum += sinl(theta3);
+			d_sum += sin(theta3);
+			d_sum += sinf(theta3);
+		}
+	}
+	double_put(d_sum);
+}
+
+/*
+ *  stress_cpu_hyperbolic()
+ *	simple hyperbolic sinh, cosh functions
+ */
+static void HOT stress_cpu_hyperbolic(const char *name)
+{
+	int i;
+	double d_sum = 0.0;
+
+	(void)name;
+
+	for (i = 0; i < 1500; i++) {
+		long double theta = (2.0L * M_PI * (double)i)/1500.0L;
+		{
+			d_sum += (coshl(theta) * sinhl(theta));
+			d_sum += (cosh(theta) * sinh(theta));
+			d_sum += (double)(coshf(theta) * sinhf(theta));
+		}
+		{
+			long double theta2 = theta * 2.0L;
+
+			d_sum += coshl(theta2);
+			d_sum += cosh(theta2);
+			d_sum += (double)coshf(theta2);
+		}
+		{
+			long double theta3 = theta * 3.0L;
+
+			d_sum += sinhl(theta3);
+			d_sum += sinh(theta3);
+			d_sum += (double)sinhf(theta3);
+		}
+	}
+	double_put(d_sum);
+}
+
+/*
+ *  stress_cpu_rand()
+ *	generate lots of pseudo-random integers
+ */
+static void HOT OPTIMIZE3 stress_cpu_rand(const char *name)
+{
+	int i;
+	uint32_t i_sum = 0;
+	const uint32_t sum = 0xc253698c;
+
+	MWC_SEED();
+	for (i = 0; i < 16384; i++)
+		i_sum += mwc32();
+}
+
+/*
+ *  stress_cpu_nsqrt()
+ *	iterative Newton–Raphson square root
+ */
+static void HOT OPTIMIZE3 stress_cpu_nsqrt(const char *name)
+{
+	int i;
+	const long double precision = 1.0e-12L;
+	const int max_iter = 56;
+
+	for (i = 0; i < 16384; i++) {
+		long double n = (double)i;
+		long double lo = (n < 1.0L) ? n : 1.0L;
+		long double hi = (n < 1.0L) ? 1.0L : n;
+		long double rt;
+		int j = 0;
+
+		while ((j++ < max_iter) && ((hi - lo) > precision)) {
+			long double g = (lo + hi) / 2.0L;
+			if ((g * g) > n)
+				hi = g;
+			else
+				lo = g;
+		}
+		rt = (lo + hi) / 2.0L;
+	}
+}
+
+/*
+ *  stress_cpu_phi()
+ *	compute the Golden Ratio
+ */
+static void HOT OPTIMIZE3 stress_cpu_phi(const char *name)
+{
+	long double phi; /* Golden ratio */
+	const long double precision = 1.0e-15L;
+	const long double phi_ = (1.0L + sqrtl(5.0L)) / 2.0L;
+	register uint64_t a, b;
+	const uint64_t mask = 1ULL << 63;
+	int i;
+
+	/* Pick any two starting points */
+	a = mwc64() % 99;
+	b = mwc64() % 99;
+
+	/* Iterate until we approach overflow */
+	for (i = 0; (i < 64) && !((a | b) & mask); i++) {
+		/* Find nth term */
+		register uint64_t c = a + b;
+
+		a = b;
+		b = c;
+	}
+	/* And we have the golden ratio */
+	phi = (long double)b / (long double)a;
+}
+
+/*
+ *  fft_partial()
+ *  	partial Fast Fourier Transform
+ */
+static void HOT OPTIMIZE3 fft_partial(
+	double complex *data,
+	double complex *tmp,
+	const int n,
+	const int m)
+{
+	if (m < n) {
+		const int m2 = m * 2;
+		int i;
+
+		fft_partial(tmp, data, n, m2);
+		fft_partial(tmp + m, data + m, n, m2);
+		for (i = 0; i < n; i += m2) {
+			const double complex negI = -I;
+			double complex v = tmp[i];
+			double complex t =
+				cexp((negI * M_PI * (double)i) /
+				     (double)n) * tmp[i + m];
+			data[i / 2] = v + t;
+			data[(i + n) / 2] = v - t;
+		}
+	}
+}
+
+/*
+ *  stress_cpu_fft()
+ *	Fast Fourier Transform
+ */
+static void HOT stress_cpu_fft(const char *name)
+{
+	double complex buf[FFT_SIZE], tmp[FFT_SIZE];
+	int i;
+
+	(void)name;
+
+	for (i = 0; i < FFT_SIZE; i++)
+		buf[i] = (double complex)(i % 63);
+
+	(void)memcpy(tmp, buf, sizeof(*tmp) * FFT_SIZE);
+	fft_partial(buf, tmp, FFT_SIZE, 1);
+}
+
+/*
+ *   stress_cpu_euler()
+ *	compute e using series
+ */
+static void HOT OPTIMIZE3 stress_cpu_euler(const char *name)
+{
+	long double e = 1.0L, last_e;
+	long double fact = 1.0L;
+	long double precision = 1.0e-20L;
+	int n = 1;
+
+	do {
+		last_e = e;
+		fact *= n;
+		n++;
+		e += (1.0L / fact);
+	} while ((n < 25) && (fabsl(e - last_e) > precision));
+}
+
+/*
+ *  random_buffer()
+ *	fill a uint8_t buffer full of random data
+ *	buffer *must* be multiple of 4 bytes in size
+ */
+static void random_buffer(uint8_t *data, const size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len / 4; i++) {
+		uint32_t v = mwc32();
+
+		*data++ = v;
+		v >>= 8;
+		*data++ = v;
+		v >>= 8;
+		*data++ = v;
+		v >>= 8;
+		*data++ = v;
+	}
+}
+
+/*
+ *  stress_cpu_hash_generic()
+ *	stress test generic string hash function
+ */
+static void stress_cpu_hash_generic(
+	const char *name,
+	const char *hash_name,
+	uint32_t (*hash_func)(const char *str),
+	const uint32_t result)
+{
+	char buffer[128];
+	size_t i;
+	uint32_t i_sum = 0;
+
+	MWC_SEED();
+	random_buffer((uint8_t *)buffer, sizeof(buffer));
+	/* Make it ASCII range ' '..'_' */
+	for (i = 0; i < sizeof(buffer); i++)
+		buffer[i] = (buffer[i] & 0x3f) + ' ';
+
+	for (i = sizeof(buffer) - 1; i; i--) {
+		buffer[i] = '\0';
+		i_sum += hash_func(buffer);
+	}
+}
+
+
+/*
+ *  jenkin()
+ *	Jenkin's hash on random data
+ *	http://www.burtleburtle.net/bob/hash/doobs.html
+ */
+static uint32_t HOT OPTIMIZE3 jenkin(const uint8_t *data, const size_t len)
+{
+	register uint8_t i;
+	register uint32_t h = 0;
+
+	for (i = 0; i < len; i++) {
+		h += *data++;
+		h += h << 10;
+		h ^= h >> 6;
+	}
+	h += h << 3;
+	h ^= h >> 11;
+	h += h << 15;
+
+	return h;
+}
+
+/*
+ *  stress_cpu_jenkin()
+ *	multiple iterations on jenkin hash
+ */
+static void stress_cpu_jenkin(const char *name)
+{
+	uint8_t buffer[128];
+	size_t i;
+	uint32_t i_sum = 0;
+	const uint32_t sum = 0x96673680;
+
+	MWC_SEED();
+	random_buffer(buffer, sizeof(buffer));
+	for (i = 0; i < sizeof(buffer); i++)
+		i_sum += jenkin(buffer, sizeof(buffer));
+}
+
+/*
+ *  pjw()
+ *	Hash a string, from Aho, Sethi, Ullman, Compiling Techniques.
+ */
+static uint32_t HOT OPTIMIZE3 pjw(const char *str)
+{
+	register uint32_t h = 0;
+
+	while (*str) {
+		register uint32_t g;
+
+		h = (h << 4) + (*str);
+		if (0 != (g = h & 0xf0000000)) {
+			h = h ^ (g >> 24);
+			h = h ^ g;
+		}
+		str++;
+	}
+	return h;
+}
+
+/*
+ *  stress_cpu_pjw()
+ *	stress test hash pjw
+ */
+static void stress_cpu_pjw(const char *name)
+{
+	stress_cpu_hash_generic(name, "pjw", pjw, 0xa89a91c0);
+}
+
+/*
+ *  djb2a()
+ *	Hash a string, from Dan Bernstein comp.lang.c (xor version)
+ */
+static uint32_t HOT OPTIMIZE3 djb2a(const char *str)
+{
+	register uint32_t hash = 5381;
+	register int c;
+
+	while ((c = *str++)) {
+		/* (hash * 33) ^ c */
+		hash = ((hash << 5) + hash) ^ c;
+	}
+	return hash;
+}
+
+/*
+ *  stress_cpu_djb2a()
+ *	stress test hash djb2a
+ */
+static void stress_cpu_djb2a(const char *name)
+{
+	stress_cpu_hash_generic(name, "djb2a", djb2a, 0x6a60cb5a);
+}
+
+/*
+ *  fnv1a()
+ *	Hash a string, using the improved 32 bit FNV-1a hash
+ */
+static uint32_t HOT OPTIMIZE3 fnv1a(const char *str)
+{
+	register uint32_t hash = 5381;
+	const uint32_t fnv_prime = 16777619; /* 2^24 + 2^9 + 0x93 */
+	register int c;
+
+	while ((c = *str++)) {
+		hash ^= c;
+		hash *= fnv_prime;
+	}
+	return hash;
+}
+
+/*
+ *  stress_cpu_fnv1a()
+ *	stress test hash fnv1a
+ */
+static void HOT stress_cpu_fnv1a(const char *name)
+{
+	stress_cpu_hash_generic(name, "fnv1a", fnv1a, 0x8ef17e80);
+}
+
+/*
+ *  sdbm()
+ *	Hash a string, using the sdbm data base hash and also
+ *	apparently used in GNU awk.
+ */
+static uint32_t OPTIMIZE3 sdbm(const char *str)
+{
+	register uint32_t hash = 0;
+	register int c;
+
+	while ((c = *str++))
+		hash = c + (hash << 6) + (hash << 16) - hash;
+	return hash;
+}
+
+/*
+ *  stress_cpu_sdbm()
+ *	stress test hash sdbm
+ */
+static void stress_cpu_sdbm(const char *name)
+{
+	stress_cpu_hash_generic(name, "sdbm", sdbm, 0x46357819);
+}
+
+/*
+ *  stress_cpu_idct()
+ *	compute 8x8 Inverse Discrete Cosine Transform
+ */
+static void HOT OPTIMIZE3 stress_cpu_idct(const char *name)
+{
+	const double invsqrt2 = 1.0 / sqrt(2.0);
+	const double pi_over_16 = M_PI / 16.0;
+	const int sz = 8;
+	int i, j, u, v;
+	float data[sz][sz], idct[sz][sz];
+
+	/*
+	 *  Set up DCT
+	 */
+	for (i = 0; i < sz; i++) {
+		for (j = 0; j < sz; j++) {
+			data[i][j] = (i + j == 0) ? 2040: 0;
+		}
+	}
+	for (i = 0; i < sz; i++) {
+		const double pi_i = (i + i + 1) * pi_over_16;
+
+		for (j = 0; j < sz; j++) {
+			const double pi_j = (j + j + 1) * pi_over_16;
+			double sum = 0.0;
+
+			for (u = 0; u < sz; u++) {
+				const double cos_pi_i_u = cos(pi_i * u);
+
+				for (v = 0; v < sz; v++) {
+					const double cos_pi_j_v =
+						cos(pi_j * v);
+
+					sum += (data[u][v] *
+						(u ? 1.0 : invsqrt2) *
+						(v ? 1.0 : invsqrt2) *
+						cos_pi_i_u * cos_pi_j_v);
+				}
+			}
+			idct[i][j] = 0.25 * sum;
+		}
+	}
+}
+
+#define int_ops(a, b, c1, c2, c3)	\
+	do {				\
+		a += b;			\
+		b ^= a;			\
+		a >>= 1;		\
+		b <<= 2;		\
+		b -= a;			\
+		a ^= ~0;		\
+		b ^= ~(c1);		\
+		a *= 3;			\
+		b *= 7;			\
+		a += 2;			\
+		b -= 3;			\
+		a /= 77;		\
+		b /= 3;			\
+		a <<= 1;		\
+		b <<= 2;		\
+		a |= 1;			\
+		b |= 3;			\
+		a *= mwc32();		\
+		b ^= mwc32();		\
+		a += mwc32();		\
+		b -= mwc32();		\
+		a /= 7;			\
+		b /= 9;			\
+		a |= (c2);		\
+		b &= (c3);		\
+	} while (0);
+
+#define C1 	(0xf0f0f0f0f0f0f0f0ULL)
+#define C2	(0x1000100010001000ULL)
+#define C3	(0xffeffffefebefffeULL)
+
+/*
+ *  Generic int stressor macro
+ */
+#define stress_cpu_int(_type, _sz, _a, _b, _c1, _c2, _c3)	\
+static void HOT OPTIMIZE3 stress_cpu_int ## _sz(const char *name)\
+{								\
+	const _type mask = ~0;					\
+	const _type a_final = _a;				\
+	const _type b_final = _b;				\
+	const _type c1 = _c1 & mask;				\
+	const _type c2 = _c2 & mask;				\
+	const _type c3 = _c3 & mask;				\
+	register _type a, b;					\
+	int i;							\
+								\
+	MWC_SEED();						\
+	a = mwc32();						\
+	b = mwc32();						\
+								\
+	for (i = 0; i < 1000; i++) {				\
+		int_ops(a, b, c1, c2, c3)			\
+	}							\
+								\
+}								\
+
+/* For compilers that support int128 .. */
+#if defined(STRESS_INT128)
+
+#define _UINT128(hi, lo)	((((__uint128_t)hi << 64) | (__uint128_t)lo))
+
+stress_cpu_int(__uint128_t, 128,
+	_UINT128(0x132af604d8b9183a,0x5e3af8fa7a663d74),
+	_UINT128(0x62f086e6160e4e,0xd84c9f800365858),
+	_UINT128(C1, C1), _UINT128(C2, C2), _UINT128(C3, C3))
+#endif
+
+stress_cpu_int(uint64_t, 64, \
+	0x013f7f6dc1d79197cULL, 0x01863d2c6969a51ceULL,
+	C1, C2, C3)
+
+stress_cpu_int(uint32_t, 32, \
+	0x1ce9b547UL, 0xa24b33aUL,
+	C1, C2, C3)
+
+stress_cpu_int(uint16_t, 16, \
+	0x1871, 0x07f0,
+	C1, C2, C3)
+
+stress_cpu_int(uint8_t, 8, \
+	0x12, 0x1a,
+	C1, C2, C3)
+
+#define float_ops(_type, a, b, c, d, _sin, _cos)	\
+	do {						\
+		a = a + b;				\
+		b = a * c;				\
+		c = a - b;				\
+		d = a / b;				\
+		a = c / (_type)0.1923L;			\
+		b = c + a;				\
+		c = b * (_type)3.12L;			\
+		d = d + b + (_type)_sin(a);		\
+		a = (b + c) / c;			\
+		b = b * c;				\
+		c = c + (_type)1.0L;			\
+		d = d - (_type)_sin(c);			\
+		a = a * (_type)_cos(b);			\
+		b = b + (_type)_cos(c);			\
+		c = (_type)_sin(a + b) / (_type)2.344L;	\
+		b = d - (_type)1.0L;			\
+	} while (0)
+
+/*
+ *  Generic floating point stressor macro
+ */
+#define stress_cpu_fp(_type, _name, _sin, _cos)		\
+static void HOT OPTIMIZE3 stress_cpu_ ## _name(const char *name)\
+{							\
+	int i;						\
+	_type a = 0.18728L, b = mwc32(), c = mwc32(), d;\
+							\
+	(void)name;					\
+							\
+	for (i = 0; i < 1000; i++) {			\
+		float_ops(_type, a, b, c, d,		\
+			_sin, _cos);			\
+	}						\
+	double_put(a + b + c + d);			\
+}
+
+stress_cpu_fp(float, float, sinf, cosf)
+stress_cpu_fp(double, double, sin, cos)
+stress_cpu_fp(long double, longdouble, sinl, cosl)
+#if defined(HAVE_FLOAT_DECIMAL) && !defined(__clang__)
+stress_cpu_fp(_Decimal32, decimal32, sinf, cosf)
+stress_cpu_fp(_Decimal64, decimal64, sin, cos)
+stress_cpu_fp(_Decimal128, decimal128, sinl, cosl)
+#endif
+
+/* Append floating point literal specifier to literal value */
+#define FP(val, ltype)	val ## ltype
+
+#if defined(__STDC_IEC_559_COMPLEX__)
+/*
+ *  Generic complex stressor macro
+ */
+#define stress_cpu_complex(_type, _ltype, _name, _csin, _ccos)	\
+static void HOT OPTIMIZE3 stress_cpu_ ## _name(const char *name)\
+{							\
+	int i;						\
+	_type cI = I;					\
+	_type a = FP(0.18728, _ltype) + 		\
+		cI * FP(0.2762, _ltype),		\
+		b = mwc32() - cI * FP(0.11121, _ltype),\
+		c = mwc32() + cI * mwc32(), d;		\
+							\
+	(void)name;					\
+							\
+	for (i = 0; i < 1000; i++) {			\
+		float_ops(_type, a, b, c, d,		\
+			_csin, _ccos);			\
+	}						\
+	double_put(a + b + c + d);			\
+}
+
+stress_cpu_complex(complex float, f, complex_float, csinf, ccosf)
+stress_cpu_complex(complex double, , complex_double, csin, ccos)
+stress_cpu_complex(complex long double, l, complex_long_double, csinl, ccosl)
+#endif /* __STDC_IEC_559_COMPLEX__ */
+
+#define int_float_ops(_ftype, flt_a, flt_b, flt_c, flt_d,	\
+	_sin, _cos, int_a, int_b, _c1, _c2, _c3)		\
+	do {							\
+		int_a += int_b;					\
+		int_b ^= int_a;					\
+		flt_a = flt_a + flt_b;				\
+		int_a >>= 1;					\
+		int_b <<= 2;					\
+		flt_b = flt_a * flt_c;				\
+		int_b -= int_a;					\
+		int_a ^= ~0;					\
+		flt_c = flt_a - flt_b;				\
+		int_b ^= ~(_c1);				\
+		int_a *= 3;					\
+		flt_d = flt_a / flt_b;				\
+		int_b *= 7;					\
+		int_a += 2;					\
+		flt_a = flt_c / (_ftype)0.1923L;		\
+		int_b -= 3;					\
+		int_a /= 77;					\
+		flt_b = flt_c + flt_a;				\
+		int_b /= 3;					\
+		int_a <<= 1;					\
+		flt_c = flt_b * (_ftype)3.12L;			\
+		int_b <<= 2;					\
+		int_a |= 1;					\
+		flt_d = flt_d + flt_b + (_ftype)_sin(flt_a);	\
+		int_b |= 3;					\
+		int_a *= mwc32();				\
+		flt_a = (flt_b + flt_c) / flt_c;		\
+		int_b ^= mwc32();				\
+		int_a += mwc32();				\
+		flt_b = flt_b * flt_c;				\
+		int_b -= mwc32();				\
+		int_a /= 7;					\
+		flt_c = flt_c + (_ftype)1.0L;			\
+		int_b /= 9;					\
+		flt_d = flt_d - (_ftype)_sin(flt_c);		\
+		int_a |= (_c2);					\
+		flt_a = flt_a * (_ftype)_cos(flt_b);		\
+		flt_b = flt_b + (_ftype)_cos(flt_c);		\
+		int_b &= (_c3);					\
+		flt_c = (_ftype)_sin(flt_a + flt_b) / (_ftype)2.344L;	\
+		flt_b = flt_d - (_ftype)1.0L;			\
+	} while (0)
+
+
+/*
+ *  Generic integer and floating point stressor macro
+ */
+#define stress_cpu_int_fp(_inttype, _sz, _ftype, _name, _a, _b, \
+	_c1, _c2, _c3, _sinf, _cosf)				\
+static void HOT OPTIMIZE3 stress_cpu_int ## _sz ## _ ## _name(const char *name)\
+{								\
+	int i;							\
+	_inttype int_a, int_b;					\
+	const _inttype mask = ~0;				\
+	const _inttype a_final = _a;				\
+	const _inttype b_final = _b;				\
+	const _inttype c1 = _c1 & mask;				\
+	const _inttype c2 = _c2 & mask;				\
+	const _inttype c3 = _c3 & mask;				\
+	_ftype flt_a = 0.18728L, flt_b = mwc32(),		\
+		flt_c = mwc32(), flt_d;				\
+								\
+	MWC_SEED();						\
+	int_a = mwc32();					\
+	int_b = mwc32();					\
+								\
+	for (i = 0; i < 1000; i++) {				\
+		int_float_ops(_ftype, flt_a, flt_b, flt_c, flt_d,\
+			_sinf, _cosf, int_a, int_b, c1, c2, c3);\
+	}							\
+								\
+	double_put(flt_a + flt_b + flt_c + flt_d);		\
+}
+
+stress_cpu_int_fp(uint32_t, 32, float, float,
+	0x1ce9b547UL, 0xa24b33aUL,
+	C1, C2, C3, sinf, cosf)
+stress_cpu_int_fp(uint32_t, 32, double, double,
+	0x1ce9b547UL, 0xa24b33aUL,
+	C1, C2, C3, sin, cos)
+stress_cpu_int_fp(uint32_t, 32, long double, longdouble,
+	0x1ce9b547UL, 0xa24b33aUL,
+	C1, C2, C3, sinl, cosl)
+stress_cpu_int_fp(uint64_t, 64, float, float,
+	0x13f7f6dc1d79197cULL, 0x1863d2c6969a51ceULL,
+	C1, C2, C3, sinf, cosf)
+stress_cpu_int_fp(uint64_t, 64, double, double,
+	0x13f7f6dc1d79197cULL, 0x1863d2c6969a51ceULL,
+	C1, C2, C3, sin, cos)
+stress_cpu_int_fp(uint64_t, 64, long double, longdouble,
+	0x13f7f6dc1d79197cULL, 0x1863d2c6969a51ceULL,
+	C1, C2, C3, sinl, cosl)
+
+#if defined(STRESS_INT128)
+stress_cpu_int_fp(__uint128_t, 128, float, float,
+	_UINT128(0x132af604d8b9183a,0x5e3af8fa7a663d74),
+	_UINT128(0x0062f086e6160e4e,0x0d84c9f800365858),
+	_UINT128(C1, C1), _UINT128(C2, C2), _UINT128(C3, C3),
+	sinf, cosf)
+stress_cpu_int_fp(__uint128_t, 128, double, double,
+	_UINT128(0x132af604d8b9183a,0x5e3af8fa7a663d74),
+	_UINT128(0x0062f086e6160e4e,0x0d84c9f800365858),
+	_UINT128(C1, C1), _UINT128(C2, C2), _UINT128(C3, C3),
+	sin, cos)
+stress_cpu_int_fp(__uint128_t, 128, long double, longdouble,
+	_UINT128(0x132af604d8b9183a,0x5e3af8fa7a663d74),
+	_UINT128(0x0062f086e6160e4e,0x0d84c9f800365858),
+	_UINT128(C1, C1), _UINT128(C2, C2), _UINT128(C3, C3),
+	sinl, cosl)
+#if defined(HAVE_FLOAT_DECIMAL) && !defined(__clang__)
+stress_cpu_int_fp(__uint128_t, 128, _Decimal32, decimal32,
+	_UINT128(0x132af604d8b9183a,0x5e3af8fa7a663d74),
+	_UINT128(0x0062f086e6160e4e,0x0d84c9f800365858),
+	_UINT128(C1, C1), _UINT128(C2, C2), _UINT128(C3, C3),
+	(_Decimal32)sinf, (_Decimal32)cosf)
+stress_cpu_int_fp(__uint128_t, 128, _Decimal64, decimal64,
+	_UINT128(0x132af604d8b9183a,0x5e3af8fa7a663d74),
+	_UINT128(0x0062f086e6160e4e,0x0d84c9f800365858),
+	_UINT128(C1, C1), _UINT128(C2, C2), _UINT128(C3, C3),
+	(_Decimal64)sin, (_Decimal64)cos)
+stress_cpu_int_fp(__uint128_t, 128, _Decimal128, decimal128,
+	_UINT128(0x132af604d8b9183a,0x5e3af8fa7a663d74),
+	_UINT128(0x0062f086e6160e4e,0x0d84c9f800365858),
+	_UINT128(C1, C1), _UINT128(C2, C2), _UINT128(C3, C3),
+	(_Decimal128)sinl, (_Decimal128)cosl)
+#endif
+#endif
+
+/*
+ *  stress_cpu_rgb()
+ *	CCIR 601 RGB to YUV to RGB conversion
+ */
+static void HOT OPTIMIZE3 stress_cpu_rgb(const char *name)
+{
+	int i;
+	uint32_t rgb = mwc32() & 0xffffff;
+	uint8_t r = rgb >> 16;
+	uint8_t g = rgb >> 8;
+	uint8_t b = rgb;
+
+	(void)name;
+
+	/* Do a 1000 colours starting from the rgb seed */
+	for (i = 0; i < 1000; i++) {
+		float y, u, v;
+
+		/* RGB to CCIR 601 YUV */
+		y = (0.299f * r) + (0.587f * g) + (0.114f * b);
+		u = (b - y) * 0.565f;
+		v = (r - y) * 0.713f;
+
+		/* YUV back to RGB */
+		r = y + (1.403f * v);
+		g = y - (0.344f * u) - (0.714f * v);
+		b = y + (1.770f * u);
+
+		/* And bump each colour to make next round */
+		r += 1;
+		g += 2;
+		b += 3;
+		uint64_put(r + g + b);
+	}
+}
+
+/*
+ *  stress_cpu_matrix_prod(void)
+ *	matrix product
+ */
+static void HOT OPTIMIZE3 stress_cpu_matrix_prod(const char *name)
+{
+	int i, j, k;
+	const int n = 128;
+
+	long double a[n][n], b[n][n], r[n][n];
+	long double v = 1 / (long double)((uint32_t)~0);
+	long double sum = 0.0L;
+
+	(void)name;
+
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < n; j++) {
+			a[i][j] = (long double)mwc32() * v;
+			b[i][j] = (long double)mwc32() * v;
+			r[i][j] = 0.0L;
+		}
+	}
+
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < n; j++) {
+			for (k = 0; k < n; k++) {
+				r[i][j] += a[i][k] * b[k][j];
+			}
+		}
+	}
+
+	for (i = 0; i < n; i++)
+		for (j = 0; j < n; j++)
+			sum += r[i][j];
+	double_put(sum);
+}
+
+/*
+ *   stress_cpu_fibonacci()
+ *	compute fibonacci series
+ */
+static void HOT OPTIMIZE3 stress_cpu_fibonacci(const char *name)
+{
+	const uint64_t fn_res = 0xa94fad42221f2702ULL;
+	register uint64_t f1 = 0, f2 = 1, fn;
+
+	do {
+		fn = f1 + f2;
+		f1 = f2;
+		f2 = fn;
+	} while (!(fn & 0x8000000000000000ULL));
+}
+
+/*
+ *  stress_cpu_psi
+ *	compute the constant psi,
+ * 	the reciprocal Fibonacci constant
+ */
+static void HOT OPTIMIZE3 stress_cpu_psi(const char *name)
+{
+	long double f1 = 0.0L, f2 = 1.0L;
+	long double psi = 0.0L, last_psi;
+	long double precision = 1.0e-20L;
+	int i = 0;
+	const int max_iter = 100;
+
+	do {
+		long double fn = f1 + f2;
+		f1 = f2;
+		f2 = fn;
+		last_psi = psi;
+		psi += 1.0L / f1;
+		i++;
+	} while ((i < max_iter) && (fabsl(psi - last_psi) > precision));
+
+	double_put(psi);
+}
+
+/*
+ *   stress_cpu_ln2
+ *	compute ln(2) using series
+ */
+static void HOT OPTIMIZE3 stress_cpu_ln2(const char *name)
+{
+	long double ln2 = 0.0L, last_ln2 = 0.0L;
+	long double precision = 1.0e-7L;
+	register int n = 1;
+	const int max_iter = 10000;
+
+	/* Not the fastest converging series */
+	do {
+		last_ln2 = ln2;
+		/* Unroll, do several ops */
+		ln2 += (long double)1.0L / (long double)n++;
+		ln2 -= (long double)1.0L / (long double)n++;
+		ln2 += (long double)1.0L / (long double)n++;
+		ln2 -= (long double)1.0L / (long double)n++;
+		ln2 += (long double)1.0L / (long double)n++;
+		ln2 -= (long double)1.0L / (long double)n++;
+		ln2 += (long double)1.0L / (long double)n++;
+		ln2 -= (long double)1.0L / (long double)n++;
+	} while ((n < max_iter) && (fabsl(ln2 - last_ln2) > precision));
+
+	double_put(ln2);
+}
+
+/*
+ *  ackermann()
+ *	a naive/simple implementation of the ackermann function
+ */
+static uint32_t HOT ackermann(const uint32_t m, const uint32_t n)
+{
+	if (m == 0)
+		return n + 1;
+	else if (n == 0)
+		return ackermann(m - 1, 1);
+	else
+		return ackermann(m - 1, ackermann(m, n - 1));
+}
+
+/*
+ *   stress_cpu_ackermann
+ *	compute ackermann function
+ */
+static void stress_cpu_ackermann(const char *name)
+{
+	uint32_t a = ackermann(3, 10);
+}
+
+/*
+ *   stress_cpu_explog
+ *	compute exp(log(n))
+ */
+static void HOT stress_cpu_explog(const char *name)
+{
+	uint32_t i;
+	double n = 1e6;
+
+	(void)name;
+
+	for (i = 1; i < 100000; i++)
+		n = exp(log(n) / 1.00002);
+}
+
+/*
+ *  Undocumented gcc-ism, force -O0 optimisation
+ */
+static void stress_cpu_jmp(const char *name)  __attribute__((optimize("-O0")));
+
+/*
+ *  This could be a ternary operator, v = (v op val) ? a : b
+ *  but it may be optimised down, so force a compare and jmp
+ *  with -O0 and a if/else construct
+ */
+#define JMP(v, op, val, a, b)		\
+	if (v op val)			\
+		v = a;			\
+	else				\
+		v = b;			\
+	uint64_put(next + i);		\
+
+/*
+ *   stress_cpu_jmp
+ *	jmp conditionals
+ */
+static void HOT stress_cpu_jmp(const char *name)
+{
+	register int i, next = 0;
+
+	(void)name;
+
+	for (i = 1; i < 1000; i++) {
+		/* Force lots of compare jmps */
+		JMP(next, ==, 1, 2, 3);
+		JMP(next, >, 2, 0, 1);
+		JMP(next, <, 1, 1, 0);
+		JMP(next, ==, 1, 2, 3);
+		JMP(next, >, 2, 0, 1);
+		JMP(next, <, 1, 1, 0);
+		JMP(next, ==, 1, 2, 3);
+		JMP(next, >, 2, 0, 1);
+		JMP(next, <, 1, 1, 0);
+		JMP(next, ==, 1, 2, 3);
+		JMP(next, >, 2, 0, 1);
+		JMP(next, <, 1, 1, 0);
+	}
+}
+
+/*
+ *  ccitt_crc16()
+ *	perform naive CCITT CRC16
+ */
+static uint16_t HOT OPTIMIZE3 ccitt_crc16(const uint8_t *data, size_t n)
+{
+	/*
+	 *  The CCITT CRC16 polynomial is
+	 *     16    12    5
+	 *    x   + x   + x  + 1
+	 *
+	 *  which is 0x11021, but to make the computation
+	 *  simpler, this has been reversed to 0x8408 and
+	 *  the top bit ignored..
+	 *  We can get away with a 17 bit polynomial
+	 *  being represented by a 16 bit value because
+	 *  we are assuming the top bit is always set.
+	 */
+	const uint16_t polynomial = 0x8408;
+	register uint16_t crc = ~0;
+
+	if (!n)
+		return 0;
+
+	for (; n; n--) {
+		uint8_t i;
+		uint8_t val = (uint16_t)0xff & *data++;
+
+		for (i = 8; i; --i, val >>= 1) {
+			bool do_xor = 1 & (val ^ crc);
+			crc >>= 1;
+			crc ^= do_xor ? polynomial : 0;
+		}
+	}
+
+	crc = ~crc;
+	return (crc << 8) | (crc >> 8);
+}
+
+/*
+ *   stress_cpu_crc16
+ *	compute 1024 rounds of CCITT CRC16
+ */
+static void stress_cpu_crc16(const char *name)
+{
+	uint8_t buffer[1024];
+	size_t i;
+
+	(void)name;
+
+	random_buffer(buffer, sizeof(buffer));
+	for (i = 0; i < sizeof(buffer); i++)
+		uint64_put(ccitt_crc16(buffer, i));
+}
+
+/*
+ *  zeta()
+ *	Riemann zeta function
+ */
+static inline long double complex HOT OPTIMIZE3 zeta(
+	const long double complex s,
+	long double precision)
+{
+	int i = 1;
+	long double complex z = 0.0L, zold = 0.0L;
+
+	do {
+		zold = z;
+		z += 1 / cpow(i++, s);
+	} while (cabsl(z - zold) > precision);
+
+	return z;
+}
+
+/*
+ * stress_cpu_zeta()
+ *	stress test Zeta(2.0)..Zeta(10.0)
+ */
+static void stress_cpu_zeta(const char *name)
+{
+	long double precision = 0.00000001L;
+	int i;
+
+	(void)name;
+
+	for (i = 2; i < 11; i++)
+		double_put(zeta((double complex)i, precision));
+}
+
+/*
+ * stress_cpu_gamma()
+ *	stress Euler–Mascheroni constant gamma
+ */
+static void HOT OPTIMIZE3 stress_cpu_gamma(const char *name)
+{
+	long double precision = 1.0e-10L;
+	long double sum = 0.0L, k = 1.0L, gamma = 0.0L, gammaold;
+
+	do {
+		gammaold = gamma;
+		sum += 1.0L / k;
+		gamma = sum - logl(k);
+		k += 1.0L;
+	} while (k < 1e6 && fabsl(gamma - gammaold) > precision);
+
+	double_put(gamma);
+}
+
+/*
+ * stress_cpu_correlate()
+ *
+ *  Introduction to Signal Processing,
+ *  Prentice-Hall, 1995, ISBN: 0-13-209172-0.
+ */
+static void HOT OPTIMIZE3 stress_cpu_correlate(const char *name)
+{
+	const size_t data_len = 16384;
+	const size_t corr_len = data_len / 16;
+	size_t i, j;
+	double data_average = 0.0;
+	double data[data_len], corr[corr_len + 1];
+
+	(void)name;
+
+	/* Generate some random data */
+	for (i = 0; i < data_len; i++) {
+		data[i] = mwc64();
+		data_average += data[i];
+	}
+	data_average /= (double)data_len;
+
+	/* And correlate */
+	for (i = 0; i <= corr_len; i++) {
+		corr[i] = 0.0;
+		for (j = 0; j < data_len - i; j++) {
+			corr[i] += (data[i + j] - data_average) *
+				   (data[j] - data_average);
+		}
+		corr[i] /= (double)corr_len;
+		double_put(corr[i]);
+	}
+}
+
+
+/*
+ *  is_prime()
+ *	return true if n is prime
+ *	http://en.wikipedia.org/wiki/Primality_test
+ */
+static inline HOT OPTIMIZE3 bool is_prime(uint32_t n)
+{
+	register uint32_t i, max;
+
+	if (n <= 3)
+		return n >= 2;
+	if ((n % 2 == 0) || (n % 3 == 0))
+		return false;
+	max = sqrt(n) + 1;
+	for (i = 5; i < max; i+= 6)
+		if ((n % i == 0) || (n % (i + 2) == 0))
+			return false;
+	return true;
+}
+
+/*
+ *  stress_cpu_prime()
+ *
+ */
+static void stress_cpu_prime(const char *name)
+{
+	uint32_t i, nprimes = 0;
+
+	for (i = 0; i < 1000000; i++) {
+		if (is_prime(i))
+			nprimes++;
+	}
+}
+
+/*
+ *  stress_cpu_gray()
+ *	compute gray codes
+ */
+static void HOT OPTIMIZE3 stress_cpu_gray(const char *name)
+{
+	register uint32_t i;
+	register uint64_t sum = 0;
+
+	for (i = 0; i < 0x10000; i++) {
+		register uint32_t gray_code;
+
+		/* Binary to Gray code */
+		gray_code = (i >> 1) ^ i;
+		sum += gray_code;
+
+		/* Gray code back to binary */
+#if 0
+		{
+			/* Slow iterative method */
+			register uint32_t mask;
+
+			for (mask = gray_code >> 1; mask; mask >>= 1)
+				gray_code ^= mask;
+		}
+#else
+		/* Fast non-loop method */
+		gray_code ^= (gray_code >> 1);
+		gray_code ^= (gray_code >> 2);
+		gray_code ^= (gray_code >> 4);
+		gray_code ^= (gray_code >> 8);
+		gray_code ^= (gray_code >> 16);
+#endif
+		sum += gray_code;
+	}
+}
+
+/*
+ * hanoi()
+ *	do a Hanoi move
+ */
+static uint32_t HOT hanoi(
+	const uint16_t n,
+	const char p1,
+	const char p2,
+	const char p3)
+{
+	if (n == 0) {
+		/* Move p1 -> p2 */
+		return 1;
+	} else {
+		uint32_t m = hanoi(n - 1, p1, p3, p2);
+		/* Move p1 -> p2 */
+		m += hanoi(n - 1, p3, p2, p1);
+		return m;
+	}
+}
+
+/*
+ *  stress_cpu_hanoi
+ *	stress with recursive Towers of Hanoi
+ */
+static void stress_cpu_hanoi(const char *name)
+{
+	uint32_t n = hanoi(20, 'X', 'Y', 'Z');
+
+	uint64_put(n);
+}
+
+/*
+ *  factorial()
+ *	compute n!
+ */
+static inline long double HOT OPTIMIZE3 factorial(int n)
+{
+	static long double factorials[] = {
+		1.0L,
+		1.0L,
+		2.0L,
+		6.0L,
+		24.0L,
+		120.0L,
+		720.0L,
+		5040.0L,
+		40320.0L,
+		362880.0L,
+		3628800.0L,
+		39916800.0L,
+		479001600.0L,
+		6227020800.0L,
+		87178291200.0L,
+		1307674368000.0L,
+		20922789888000.0L,
+		355687428096000.0L,
+		6402373705728000.0L,
+		121645100408832000.0L,
+		2432902008176640000.0L,
+		51090942171709440000.0L,
+		1124000727777607680000.0L,
+		25852016738884976640000.0L,
+		620448401733239439360000.0L,
+		15511210043330985984000000.0L,
+		403291461126605635592388608.0L,
+		10888869450418352161430700032.0L,
+		304888344611713860511469666304.0L,
+		8841761993739701954695181369344.0L,
+		265252859812191058647452510846976.0L,
+		8222838654177922818071027836256256.0L,
+		263130836933693530178272890760200192.0L
+	};
+
+	if (n < (int)SIZEOF_ARRAY(factorials))
+		return factorials[n];
+
+	return roundl(expl(lgammal((long double)(n + 1))));
+}
+
+/*
+ *  stress_cpu_pi()
+ *	compute pi using the Srinivasa Ramanujan
+ *	fast convergence algorithm
+ */
+static void HOT OPTIMIZE3 stress_cpu_pi(const char *name)
+{
+	long double s = 0.0L, pi = 0.0L, last_pi = 0.0L;
+	const long double precision = 1.0e-20L;
+	const long double c = 2.0L * sqrtl(2.0L) / 9801.0L;
+	const int max_iter = 5;
+	int k = 0;
+
+	do {
+		last_pi = pi;
+		s += (factorial(4 * k) *
+			((26390.0L * (long double)k) + 1103)) /
+			(powl(factorial(k), 4.0L) * powl(396.0L, 4.0L * k));
+		pi = 1 / (s * c);
+		k++;
+	} while ((k < max_iter) && (fabsl(pi - last_pi) > precision));
+
+	double_put(pi);
+}
+
+/*
+ *  stress_cpu_omega()
+ *	compute the constant omega
+ *	See http://en.wikipedia.org/wiki/Omega_constant
+ */
+static void HOT OPTIMIZE3 stress_cpu_omega(const char *name)
+{
+	long double omega = 0.5L, last_omega = 0.0L;
+	const long double precision = 1.0e-20L;
+	const int max_iter = 6;
+	int n = 0;
+
+	/* Omega converges very quickly */
+	do {
+		last_omega = omega;
+		omega = (1 + omega) / (1 + expl(omega));
+		n++;
+	} while ((n < max_iter) && (fabsl(omega - last_omega) > precision));
+
+	double_put(omega);
+}
+
+#define HAMMING(G, i, nybble, code) 			\
+{							\
+	int8_t res;					\
+	res = (((G[3] >> i) & (nybble >> 3)) & 1) ^	\
+	      (((G[2] >> i) & (nybble >> 2)) & 1) ^	\
+	      (((G[1] >> i) & (nybble >> 1)) & 1) ^	\
+	      (((G[0] >> i) & (nybble >> 0)) & 1);	\
+	code ^= ((res & 1) << i);			\
+}
+
+/*
+ *  hamming84()
+ *	compute Hamming (8,4) codes
+ */
+static uint8_t HOT OPTIMIZE3 hamming84(const uint8_t nybble)
+{
+	/*
+	 * Hamming (8,4) Generator matrix
+	 * (4 parity bits, 4 data bits)
+	 *
+	 *  p1 p2 p3 p4 d1 d2 d3 d4
+	 *  0  1  1  1  1  0  0  0
+	 *  1  0  1  1  0  1  0  0
+	 *  1  1  0  1  0  0  1  0
+	 *  1  1  1  0  0  0  0  1
+	 *
+	 * Where:
+	 *  d1..d4 = 4 data bits
+	 *  p1..p4 = 4 parity bits:
+	 *    p1 = d2 + d3 + d4
+	 *    p2 = d1 + d3 + d4
+	 *    p3 = d1 + d2 + d4
+	 *    p4 = d1 + d2 + d3
+	 *
+	 * G[] is reversed to turn G[3-j] into G[j] to save a subtraction
+	 */
+	static const uint8_t G[] = {
+		0xf1,	/* 0b11110001 */
+		0xd2,	/* 0b11010010 */
+		0xb4,	/* 0b10110100 */
+		0x78,	/* 0b01111000 */
+	};
+
+	register uint8_t code = 0;
+
+	/* Unrolled 8 bit loop x unrolled 4 bit loop  */
+	HAMMING(G, 7, nybble, code);
+	HAMMING(G, 6, nybble, code);
+	HAMMING(G, 5, nybble, code);
+	HAMMING(G, 4, nybble, code);
+	HAMMING(G, 3, nybble, code);
+	HAMMING(G, 2, nybble, code);
+	HAMMING(G, 1, nybble, code);
+	HAMMING(G, 0, nybble, code);
+
+	return code;
+}
+
+/*
+ *  stress_cpu_hamming()
+ *	compute hamming code on 65536 x 4 nybbles
+ */
+static void HOT OPTIMIZE3 stress_cpu_hamming(const char *name)
+{
+	uint32_t i;
+	uint32_t sum = 0;
+
+	for (i = 0; i < 65536; i++) {
+		uint32_t encoded;
+
+		/* 4 x 4 bits to 4 x 8 bits hamming encoded */
+		encoded =
+			  (hamming84((i >> 12) & 0xf) << 24) |
+			  (hamming84((i >> 8) & 0xf) << 16) |
+			  (hamming84((i >> 4) & 0xf) << 8) |
+			  (hamming84((i >> 0) & 0xf) << 0);
+		sum += encoded;
+	}
+}
+
+
+static ptrdiff_t stress_cpu_callfunc_func(
+	ssize_t		n,
+	uint64_t	u64arg,
+	uint32_t	u32arg,
+	uint16_t	u16arg,
+	uint8_t		u8arg,
+	uint64_t	*p_u64arg,
+	uint32_t	*p_u32arg,
+	uint16_t	*p_u16arg,
+	uint8_t		*p_u8arg)
+{
+	if (n > 0)
+		return stress_cpu_callfunc_func(n - 1,
+			u64arg, u32arg, u16arg, u8arg,
+			p_u64arg, p_u32arg, p_u16arg, p_u8arg);
+	else
+		return &u64arg - p_u64arg;
+}
+
+/*
+ *  stress_cpu_callfunc()
+ *	deep function calls
+ */
+static void stress_cpu_callfunc(const char *name)
+{
+	uint64_t	u64arg = mwc64();
+	uint32_t	u32arg = mwc32();
+	uint16_t	u16arg = mwc16();
+	uint8_t		u8arg  = mwc8();
+	ptrdiff_t	ret;
+
+	(void)name;
+
+	ret = stress_cpu_callfunc_func(1024,
+		u64arg, u32arg, u16arg, u8arg,
+		&u64arg, &u32arg, &u16arg, &u8arg);
+
+	uint64_put((uint64_t)ret);
+}
+
+
+#define P2(n) n, n^1, n^1, n
+#define P4(n) P2(n), P2(n^1), P2(n^1), P2(n)
+#define P6(n) P4(n), P4(n^1), P4(n^1), P4(n)
+
+static const bool stress_cpu_parity_table[256] = {
+	P6(0), P6(1), P6(1), P6(0)
+};
+
+/*
+ *  stress_cpu_parity
+ *	compute parity different ways
+ */
+static void stress_cpu_parity(const char *name)
+{
+	uint32_t val = 0x83fb5acf;
+	size_t i;
+
+	for (i = 0; i < 1000; i++, val++) {
+		register uint32_t v, parity, p;
+		uint8_t *ptr;
+
+		/*
+		 * Naive way
+		 */
+		v = val;
+		parity = 0;
+		while (v) {
+			if (v & 1)
+				parity = !parity;
+			v >>= 1;
+		}
+
+		/*
+		 * Naive way with Brian Kernigan's bit counting optimisation
+		 * https://graphics.stanford.edu/~seander/bithacks.html
+		 */
+		v = val;
+		p = 0;
+		while (v) {
+			p = !p;
+			v = v & (v - 1);
+		}
+
+		/*
+		 * "Compute parity of a word with a multiply"
+		 * the Andrew Shapira method,
+		 * https://graphics.stanford.edu/~seander/bithacks.html
+		 */
+		v = val;
+		v ^= v >> 1;
+		v ^= v >> 2;
+		v = (v & 0x11111111U) * 0x11111111U;
+		p = (v >> 28) & 1;
+
+		/*
+		 * "Compute parity in parallel"
+		 * https://graphics.stanford.edu/~seander/bithacks.html
+		 */
+		v = val;
+		v ^= v >> 16;
+		v ^= v >> 8;
+		v ^= v >> 4;
+		v &= 0xf;
+		p = (0x6996 >> v) & 1;
+
+		/*
+		 * "Compute parity by lookup table"
+		 * https://graphics.stanford.edu/~seander/bithacks.html
+		 * Variation #1
+		 */
+		v = val;
+		v ^= v >> 16;
+		v ^= v >> 8;
+		p = stress_cpu_parity_table[v & 0xff];
+
+		/*
+		 * "Compute parity by lookup table"
+		 * https://graphics.stanford.edu/~seander/bithacks.html
+		 * Variation #2
+		 */
+		ptr = (uint8_t *)&val;
+		p = stress_cpu_parity_table[ptr[0] ^ ptr[1] ^ ptr[2] ^ ptr[3]];
+	}
+}
+
+/*
+ *  stress_cpu_dither
+ *	perform 8 bit to 1 bit gray scale
+ *	Floyd–Steinberg dither
+ */
+static void stress_cpu_dither(const char *name)
+{
+	size_t x, y;
+
+	(void)name;
+
+	/*
+	 *  Generate some random 8 bit image
+	 */
+	for (y = 0; y < STRESS_CPU_DITHER_Y; y += 8) {
+		for (x = 0; x < STRESS_CPU_DITHER_X; x ++) {
+			uint64_t v = mwc64();
+
+			pixels[x][y + 0] = v;
+			v >>= 8;
+			pixels[x][y + 1] = v;
+			v >>= 8;
+			pixels[x][y + 2] = v;
+			v >>= 8;
+			pixels[x][y + 3] = v;
+			v >>= 8;
+			pixels[x][y + 4] = v;
+			v >>= 8;
+			pixels[x][y + 5] = v;
+			v >>= 8;
+			pixels[x][y + 6] = v;
+			v >>= 8;
+			pixels[x][y + 7] = v;
+		}
+	}
+
+	/*
+	 *  ..and dither
+	 */
+	for (y = 0; y < STRESS_CPU_DITHER_Y; y++) {
+		for (x = 0; x < STRESS_CPU_DITHER_X; x++) {
+			uint8_t pixel = pixels[x][y];
+			uint8_t quant = (pixel < 128) ? 0 : 255;
+			int32_t error = pixel - quant;
+
+			bool xok1 = x < (STRESS_CPU_DITHER_X - 1);
+			bool xok2 = x > 0;
+			bool yok1 = y < (STRESS_CPU_DITHER_Y - 1);
+
+			if (xok1)
+				pixels[x + 1][y] +=
+					(error * 7) >> 4;
+			if (xok2 && yok1)
+				pixels[x - 1][y + 1] +=
+					(error * 3) >> 4;
+			if (yok1)
+				pixels[x][y + 1] +=
+					(error * 5) >> 4;
+			if (xok1 && yok1)
+				pixels[x + 1][y + 1] +=
+					error >> 4;
+		}
+	}
+}
+
+/*
+ *  stress_cpu_union
+ *	perform bit field operations on a union
+ */
+static void stress_cpu_union(const char *name)
+{
+	typedef union {
+		struct {
+			uint64_t	b1:1;
+			uint64_t	b10:10;
+			uint64_t	b2:2;
+			uint64_t	b9:9;
+			uint64_t	b3:3;
+			uint64_t	b8:8;
+			uint64_t	b4:4;
+			uint64_t	b7:7;
+			uint64_t	b5:5;
+			uint64_t	b6:6;
+		} bits64;
+		uint64_t	u64:64;
+		union {
+			uint8_t		b1:1;
+			uint8_t		b7:7;
+			uint8_t		b8:8;
+		} bits8;
+		struct {
+			uint16_t	b15:15;
+			uint16_t	b1:1;
+		} bits16;
+		struct {
+			uint32_t	b10:10;
+			uint32_t	b20:20;
+			uint32_t	:1;
+			uint32_t	b1:1;
+		} bits32;
+		uint32_t	u32:30;
+	} u_t;
+
+	static u_t u;
+	size_t i;
+
+	(void)name;
+	for (i = 0; i < 1000; i++) {
+		u.bits64.b1 ^= 1;
+		u.bits64.b2--;
+		u.bits32.b10 ^= ~0;
+		u.bits64.b3++;
+		u.bits16.b1--;
+		u.bits8.b1++;
+		u.bits64.b4 *= 2;
+		u.bits32.b20 += 3;
+		u.u64 += 0x1037fc2ae21ef829ULL;
+		u.bits64.b6--;
+		u.bits8.b7 *= 3;
+		u.bits64.b5 += (u.bits64.b4 << 1);
+		u.bits32.b1 ^= 1;
+		u.bits64.b7++;
+		u.bits8.b8 ^= 0xaa;
+		u.bits64.b8--;
+		u.bits16.b15 ^= 0xbeef;
+		u.bits64.b9++;
+		u.bits64.b10 *= 5;
+	}
+}
+
+static const uint32_t queens_solutions[] = {
+	-1, 1, 0, 0, 2, 10, 4, 40, 92, 352, 724, 2680, 14200
+};
+
+/*
+ *  Solution from http://www.cl.cam.ac.uk/~mr10/backtrk.pdf
+ *     see section 2.1
+ */
+static uint32_t queens_try(
+	uint32_t left_diag,
+	uint32_t cols,
+	uint32_t right_diag,
+	uint32_t all)
+{
+	register uint32_t solutions = 0;
+	register uint32_t poss = ~(left_diag | cols | right_diag) & all;
+
+	while (poss) {
+		register uint32_t bit = poss & -poss;
+		register uint32_t new_cols = cols | bit;
+
+		poss -= bit;
+		solutions += (new_cols == all) ?
+			1 : queens_try((left_diag | bit) << 1,
+				new_cols, (right_diag | bit) >> 1, all);
+	}
+	return solutions;
+}
+
+
+/*
+ *  stress_cpu_queens
+ *	solve the queens problem for sizes 1..12
+ */
+static void stress_cpu_queens(const char *name)
+{
+	uint32_t all, n;
+
+	for (all = 1, n = 1; n < 13; n++) {
+		uint32_t solutions = queens_try(0, 0, 0, all);
+		all = (all + all) + 1;
+	}
+}
+
+/*
+ *  stress_cpu_factorial
+ *	find factorials from 1..150 using
+ *	Stirling's and Ramanujan's Approximations.
+ */
+static void stress_cpu_factorial(const char *name)
+{
+	int n;
+	double f = 1.0;
+	const double precision = 1.0e-6;
+	const double sqrt_pi = sqrtl(M_PI);
+
+	for (n = 1; n < 150; n++) {
+		double fact = roundl(expl(lgammal((double)(n + 1))));
+		double dn;
+
+		f *= (double)n;
+
+
+		/* Ramanujan */
+		dn = (double)n;
+		fact = sqrt_pi * powl((dn / M_E), dn);
+		fact *= powl((((((((8 * dn) + 4)) * dn) + 1) * dn) + 1.0/30.0), (1.0/6.0));
+	}
+}
+
+/*
+ *  stress_cpu_stats
+ *	Exercise some standard stats computations on random data
+ */
+static void stress_cpu_stats(const char *name)
+{
+	size_t i;
+	double data[STATS_MAX];
+	double min, max, am = 0.0, gm = 1.0, hm = 0.0, stddev = 0.0;
+
+	for (i = 0; i < STATS_MAX; i++)
+		data[i] = ((double)(mwc32() + 1)) / 4294967296.0;
+
+	min = max = data[0];
+
+	for (i = 0; i < STATS_MAX; i++) {
+		double d = data[i];
+
+		if (min > d)
+			min = d;
+		if (max < d)
+			max = d;
+
+		am += d;
+		gm *= d;
+		hm += 1 / d;
+	}
+	/* Arithmetic mean (average) */
+	am = am / STATS_MAX;
+	/* Geometric mean */
+	gm = pow(gm, 1.0 / STATS_MAX);
+	/* Harmonic mean */
+	hm = STATS_MAX / hm;
+
+	for (i = 0; i < STATS_MAX; i++) {
+		double d = data[i] - am;
+		stddev += (d * d);
+	}
+	/* Standard Deviation */
+	stddev = sqrt(stddev);
+
+	double_put(am);
+	double_put(gm);
+	double_put(hm);
+	double_put(stddev);
+}
+
+/*
+ *  stress_cpu_all()
+ *	iterate over all cpu stressors
+ */
+static HOT OPTIMIZE3 void stress_cpu_all(const char *name)
+{
+	static int i = 1;	/* Skip over stress_cpu_all */
+
+	cpu_methods[i++].func(name);
+	if (!cpu_methods[i].func)
+		i = 1;
+}
+
+/*
+ * Table of cpu stress methods
+ */
+static const stress_cpu_method_info_t cpu_methods[] = {
+	{ "all",		stress_cpu_all },	/* Special "all test */
+
+	{ "ackermann",		stress_cpu_ackermann },
+	{ "bitops",		stress_cpu_bitops },
+	{ "callfunc",		stress_cpu_callfunc },
+#if defined(__STDC_IEC_559_COMPLEX__)
+	{ "cdouble",		stress_cpu_complex_double },
+	{ "cfloat",		stress_cpu_complex_float },
+	{ "clongdouble",	stress_cpu_complex_long_double },
+#endif /* __STDC_IEC_559_COMPLEX__ */
+	{ "correlate",		stress_cpu_correlate },
+	{ "crc16",		stress_cpu_crc16 },
+#if defined(HAVE_FLOAT_DECIMAL) && !defined(__clang__)
+	{ "decimal32",		stress_cpu_decimal32 },
+	{ "decimal64",		stress_cpu_decimal64 },
+	{ "decimal128",		stress_cpu_decimal128 },
+#endif
+	{ "dither",		stress_cpu_dither },
+	{ "djb2a",		stress_cpu_djb2a },
+	{ "double",		stress_cpu_double },
+	{ "euler",		stress_cpu_euler },
+	{ "explog",		stress_cpu_explog },
+	{ "fft",		stress_cpu_fft },
+	{ "factorial",		stress_cpu_factorial },
+	{ "fibonacci",		stress_cpu_fibonacci },
+	{ "float",		stress_cpu_float },
+	{ "fnv1a",		stress_cpu_fnv1a },
+	{ "gamma",		stress_cpu_gamma },
+	{ "gcd",		stress_cpu_gcd },
+	{ "gray",		stress_cpu_gray },
+	{ "hamming",		stress_cpu_hamming },
+	{ "hanoi",		stress_cpu_hanoi },
+	{ "hyperbolic",		stress_cpu_hyperbolic },
+	{ "idct",		stress_cpu_idct },
+#if defined(STRESS_INT128)
+	{ "int128",		stress_cpu_int128 },
+#endif
+	{ "int64",		stress_cpu_int64 },
+	{ "int32",		stress_cpu_int32 },
+	{ "int16",		stress_cpu_int16 },
+	{ "int8",		stress_cpu_int8 },
+#if defined(STRESS_INT128)
+	{ "int128float",	stress_cpu_int128_float },
+	{ "int128double",	stress_cpu_int128_double },
+	{ "int128longdouble",	stress_cpu_int128_longdouble },
+#if defined(HAVE_FLOAT_DECIMAL) && !defined(__clang__)
+	{ "int128decimal32",	stress_cpu_int128_decimal32 },
+	{ "int128decimal64",	stress_cpu_int128_decimal64 },
+	{ "int128decimal128",	stress_cpu_int128_decimal128 },
+#endif
+#endif
+	{ "int64float",		stress_cpu_int64_float },
+	{ "int64double",	stress_cpu_int64_double },
+	{ "int64longdouble",	stress_cpu_int64_longdouble },
+	{ "int32float",		stress_cpu_int32_float },
+	{ "int32double",	stress_cpu_int32_double },
+	{ "int32longdouble",	stress_cpu_int32_longdouble },
+	{ "jenkin",		stress_cpu_jenkin },
+	{ "jmp",		stress_cpu_jmp },
+	{ "ln2",		stress_cpu_ln2 },
+	{ "longdouble",		stress_cpu_longdouble },
+	{ "loop",		stress_cpu_loop },
+	{ "matrixprod",		stress_cpu_matrix_prod },
+	{ "nsqrt",		stress_cpu_nsqrt },
+	{ "omega",		stress_cpu_omega },
+	{ "parity",		stress_cpu_parity },
+	{ "phi",		stress_cpu_phi },
+	{ "pi",			stress_cpu_pi },
+	{ "pjw",		stress_cpu_pjw },
+	{ "prime",		stress_cpu_prime },
+	{ "psi",		stress_cpu_psi },
+	{ "queens",		stress_cpu_queens },
+	{ "rand",		stress_cpu_rand },
+	{ "rgb",		stress_cpu_rgb },
+	{ "sdbm",		stress_cpu_sdbm },
+	{ "stats",		stress_cpu_stats },
+	{ "sqrt", 		stress_cpu_sqrt },
+	{ "trig",		stress_cpu_trig },
+	{ "union",		stress_cpu_union },
+	{ "zeta",		stress_cpu_zeta },
+	{ NULL,			NULL }
+};
+

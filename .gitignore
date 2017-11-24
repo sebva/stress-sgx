@@ -2,6 +2,11 @@ perf-event.h
 personality.h
 stress-ng
 
+#generated proxy
+*_u.c
+*_u.h
+*_t.c
+*_t.h
 
 # Prerequisites
 *.d
