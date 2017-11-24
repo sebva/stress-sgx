@@ -43,7 +43,7 @@ endif
 
 Crypto_Library_Name := sgx_tcrypto
 
-Enclave_C_Files := trusted/enclave.c 
+Enclave_C_Files := trusted/enclave.c
 Enclave_Include_Paths := -IInclude -Itrusted -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/libcxx
 
 Flags_Just_For_C := -Wno-implicit-function-declaration -std=c11
@@ -100,7 +100,7 @@ trusted/enclave_t.o: ./trusted/enclave_t.c
 	@$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
-trusted/%.o: trusted/%.c
+trusted/%.o: trusted/%.c trusted/stress-cpu.c
 	@$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC  <=  $<"
 
