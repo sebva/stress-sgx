@@ -1,46 +1,34 @@
 #include "enclave_t.h"  /* print_string */
 #include "stress-cpu.c"
 
-int ecall_enclave_sample()
+/*
+ *  keep_stressing()
+ *	returns true if we can keep on running a stressor
+ */
+bool HOT OPTIMIZE3 keep_stressing(const uint64_t rounds, uint64_t* counter)
 {
-	return 42;
+	return LIKELY(!rounds || (*counter < rounds));
 }
 
-/*
-// stressor args
-typedef struct {
-	uint64_t *const counter;	// stressor counter
-	const char *name;		// stressor name
-	const uint64_t max_ops;		// max number of bogo ops
-	const uint32_t instance;	// stressor instance #
-	const uint32_t num_instances;	// number of instances
-	pid_t pid;			// stressor pid
-	pid_t ppid;			// stressor ppid
-	size_t page_size;		// page size
-} args_t;
-//*/
+void run_stressor(const stress_cpu_method_info_t* info, const uint64_t rounds) {
+	uint64_t counter = 0;
 
-/*
- *  stress_set_cpu_method()
- *	set the default cpu stress method
-/*
-int stress_set_cpu_method(const char *name)
+	do {
+		(info->func)("stress-sgx");
+		counter++;
+	} while(keep_stressing(rounds, &counter));
+}
+
+int ecall_stress_cpu(const char* method_name, const uint64_t rounds)
 {
 	stress_cpu_method_info_t const *info;
 
 	for (info = cpu_methods; info->func; info++) {
-		if (!strcmp(info->name, name)) {
-			set_setting("cpu-method", TYPE_ID_UINTPTR_T, &info);
+		if (!strcmp(info->name, method_name)) {
+			run_stressor(info, rounds);
 			return 0;
 		}
 	}
 
-	(void)fprintf(stderr, "cpu-method must be one of:");
-	for (info = cpu_methods; info->func; info++) {
-		(void)fprintf(stderr, " %s", info->name);
-	}
-	(void)fprintf(stderr, "\n");
-
 	return -1;
 }
-//*/
