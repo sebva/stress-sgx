@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 
-VERSION=0.09.03
+VERSION=0.09.04
 #
 # Codename "harmful hardware harasser"
 #
@@ -147,6 +147,7 @@ STRESS_SRC = \
 	stress-mmap.c \
 	stress-mmapfork.c \
 	stress-mmapmany.c \
+	stress-mmapaddr.c \
 	stress-mremap.c \
 	stress-msg.c \
 	stress-msync.c \

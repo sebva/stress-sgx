@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH STRESS-NG 1 "November 19, 2017"
+.TH STRESS-NG 1 "November 26, 2017"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -944,7 +944,13 @@ mixes found in these use cases.
 .TP
 .B \-\-cpu\-online N
 start N workers that put randomly selected CPUs offline and online. This Linux
-only stressor requires root privilege to perform this action.
+only stressor requires root privilege to perform this action. By default the
+first CPU (CPU 0) is never offlined as this has been found to be problematic
+on some systems and can result in a shutdown.
+.TP
+.B \-\-cpu\-online\-all
+The default is to never offline the first CPU.  This option will offline and
+online all the CPUs include CPU 0. This may cause some systems to shutdown.
 .TP
 .B \-\-cpu\-online\-ops N
 stop after offline/online operations.
@@ -1989,6 +1995,16 @@ each page.
 change protection settings on each page of memory.  Each time a page or a
 group of pages are mapped or remapped then this option will make the pages
 read-only, write-only, exec-only, and read-write.
+.TP
+.B \-\-mmapaddr N
+start N workers that memory map pages at a random memory location that is
+not already mapped.  On 64 bit machines the random address is randomly
+chosen 32 bit or 64 bit address. If the mapping works a second page is
+memory mapped from the first mapped address. The stressor exercises
+mmap/munmap, mincore and segfault handling.
+.TP
+.B \-\-mmapaddr\-ops N
+stop after N random address mmap bogo operations.
 .TP
 .B \-\-mmapfork N
 start N workers that each fork off 32 child processes, each of which tries to

@@ -295,6 +295,7 @@ static const stress_t stressors[] = {
 	STRESSOR(mknod, MKNOD, CLASS_FILESYSTEM | CLASS_OS),
 	STRESSOR(mlock, MLOCK, CLASS_VM | CLASS_OS),
 	STRESSOR(mmap, MMAP, CLASS_VM | CLASS_OS),
+	STRESSOR(mmapaddr, MMAPADDR, CLASS_VM | CLASS_OS),
 	STRESSOR(mmapfork, MMAPFORK, CLASS_SCHEDULER | CLASS_VM | CLASS_OS),
 	STRESSOR(mmapmany, MMAPMANY, CLASS_VM | CLASS_OS),
 	STRESSOR(mq, MQ, CLASS_SCHEDULER | CLASS_OS),
@@ -482,6 +483,7 @@ static const struct option long_options[] = {
 	{ "cpu-method",	1,	0,	OPT_CPU_METHOD },
 	{ "cpu-online",	1,	0,	OPT_CPU_ONLINE },
 	{ "cpu-online-ops",1,	0,	OPT_CPU_ONLINE_OPS },
+	{ "cpu-online-all", 0,	0,	OPT_CPU_ONLINE_ALL },
 	{ "crypt",	1,	0,	OPT_CRYPT },
 	{ "crypt-ops",	1,	0,	OPT_CRYPT_OPS },
 	{ "cyclic",	1,	0,	OPT_CYCLIC },
@@ -683,6 +685,8 @@ static const struct option long_options[] = {
 	{ "mmap-bytes",	1,	0,	OPT_MMAP_BYTES },
 	{ "mmap-file",	0,	0,	OPT_MMAP_FILE },
 	{ "mmap-mprotect",0,	0,	OPT_MMAP_MPROTECT },
+	{ "mmapaddr",	1,	0,	OPT_MMAPADDR },
+	{ "mmapaddr-ops",1,	0,	OPT_MMAPADDR_OPS },
 	{ "mmapfork",	1,	0,	OPT_MMAPFORK },
 	{ "mmapfork-ops",1,	0,	OPT_MMAPFORK_OPS },
 	{ "mmapmany",	1,	0,	OPT_MMAPMANY },
@@ -1266,6 +1270,8 @@ static const help_t help_stressors[] = {
 	{ NULL,		"mmap-bytes N",		"mmap and munmap N bytes for each stress iteration" },
 	{ NULL,		"mmap-file",		"mmap onto a file using synchronous msyncs" },
 	{ NULL,		"mmap-mprotect",	"enable mmap mprotect stressing" },
+	{ NULL,		"mmapaddr N",		"start N workers stressing mmap with random addresses" },
+	{ NULL,		"mmapaddr-ops N",	"stop after N mmapaddr bogo operations" },
 	{ NULL,		"mmapfork N",		"start N workers stressing many forked mmaps/munmaps" },
 	{ NULL,		"mmapfork-ops N",	"stop after N mmapfork bogo operations" },
 	{ NULL,		"mmapmany N",		"start N workers stressing many mmaps and munmaps" },
@@ -2953,6 +2959,9 @@ next_opt:
 			break;
 		case OPT_CPU_LOAD_SLICE:
 			stress_set_cpu_load_slice(optarg);
+			break;
+		case OPT_CPU_ONLINE_ALL:
+			g_opt_flags |= OPT_FLAGS_CPU_ONLINE_ALL;
 			break;
 		case OPT_CPU_METHOD:
 			if (stress_set_cpu_method(optarg) < 0)

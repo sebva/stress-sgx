@@ -171,9 +171,9 @@ typedef unsigned long int __kernel_ulong_t;
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-/* GNU HURD */
+/* GNU HURD and other systems that don't define PATH_MAX */
 #ifndef PATH_MAX
-#define PATH_MAX 		(4096)		/* Some systems don't define this */
+#define PATH_MAX 		(4096)
 #endif
 
 /*
@@ -262,6 +262,7 @@ typedef unsigned long int __kernel_ulong_t;
 #define OPT_FLAGS_THRASH	 0x04000000000000ULL	/* --thrash */
 #define OPT_FLAGS_OOMABLE	 0x08000000000000ULL	/* --oomable */
 #define OPT_FLAGS_ABORT		 0x10000000000000ULL	/* --abort */
+#define OPT_FLAGS_CPU_ONLINE_ALL 0x20000000000000ULL	/* --cpu-online-all */
 
 #define OPT_FLAGS_CACHE_MASK		\
 	(OPT_FLAGS_CACHE_FLUSH |	\
@@ -271,6 +272,7 @@ typedef unsigned long int __kernel_ulong_t;
 #define OPT_FLAGS_MINMAX_MASK		\
 	(OPT_FLAGS_MINIMIZE | OPT_FLAGS_MAXIMIZE)
 
+/* Aggressive mode flags */
 #define OPT_FLAGS_AGGRESSIVE_MASK 	\
 	(OPT_FLAGS_AFFINITY_RAND |	\
 	 OPT_FLAGS_UTIME_FSYNC |	\
@@ -408,18 +410,21 @@ typedef struct {
 #define CASE_FALLTHROUGH /* Fallthrough */
 #endif
 
+/* no return hint */
 #if defined(__GNUC__) && NEED_GNUC(2,5,0)
 #define NORETURN 	__attribute__ ((noreturn))
 #else
 #define NORETURN
 #endif
 
+/* force inlining hint */
 #if defined(__GNUC__) && NEED_GNUC(3,4,0)	/* or possibly earier */
 #define ALWAYS_INLINE	__attribute__ ((always_inline))
 #else
 #define ALWAYS_INLINE
 #endif
 
+/* force no inlining hint */
 #if defined(__GNUC__) && NEED_GNUC(3,4,0)	/* or possibly earier */
 #define NOINLINE	__attribute__ ((noinline))
 #else
@@ -433,6 +438,7 @@ typedef struct {
 #define OPTIMIZE3
 #endif
 
+/* -O1 attribute support */
 #if defined(__GNUC__) && !defined(__clang__) && NEED_GNUC(4,6,0)
 #define OPTIMIZE1 	__attribute__((optimize("-O1")))
 #else
@@ -482,6 +488,7 @@ typedef struct {
 #define MLOCKED
 #endif
 
+/* print format attribute */
 #if defined(__GNUC__) && NEED_GNUC(3,2,0)
 #define FORMAT(func, a, b) __attribute__((format(func, a, b)))
 #else
@@ -1005,6 +1012,7 @@ static inline void ALWAYS_INLINE inc_counter(const args_t *args)
 	(*(args->counter))++;
 }
 
+/* pthread porting shims, spinlock or fallback to mutex */
 #if defined(HAVE_LIB_PTHREAD)
 #if defined(HAVE_LIB_PTHREAD_SPINLOCK)
 typedef pthread_spinlock_t 	shim_pthread_spinlock_t;
@@ -1093,7 +1101,7 @@ typedef struct {
 	bool run_ok;			/* true if stressor exited OK */
 } proc_stats_t;
 
-/* Shared memory segment */
+/* The stress-ng global shared memory segment */
 typedef struct {
 	size_t length;					/* Size of segment */
 	uint8_t	*mem_cache;				/* Shared memory cache */
@@ -1244,6 +1252,7 @@ typedef enum {
 	STRESS_MKNOD,
 	STRESS_MLOCK,
 	STRESS_MMAP,
+	STRESS_MMAPADDR,
 	STRESS_MMAPFORK,
 	STRESS_MMAPMANY,
 	STRESS_MREMAP,
@@ -1472,6 +1481,7 @@ typedef enum {
 
 	OPT_CPU_ONLINE,
 	OPT_CPU_ONLINE_OPS,
+	OPT_CPU_ONLINE_ALL,
 
 	OPT_CRYPT,
 	OPT_CRYPT_OPS,
@@ -1736,6 +1746,9 @@ typedef enum {
 	OPT_MMAP_FILE,
 	OPT_MMAP_ASYNC,
 	OPT_MMAP_MPROTECT,
+
+	OPT_MMAPADDR,
+	OPT_MMAPADDR_OPS,
 
 	OPT_MMAPFORK,
 	OPT_MMAPFORK_OPS,
@@ -2282,8 +2295,11 @@ static inline WARN_UNUSED double timeval_to_double(const struct timeval *tv)
         return (double)tv->tv_sec + ((double)tv->tv_usec / 1000000.0);
 }
 
+extern double time_now(void);
+extern const char *duration_to_str(const double duration);
+
+/* Perf statistics */
 #if defined(STRESS_PERF_STATS)
-/* Perf stats */
 extern int perf_open(stress_perf_t *sp);
 extern int perf_enable(stress_perf_t *sp);
 extern int perf_disable(stress_perf_t *sp);
@@ -2292,9 +2308,6 @@ extern bool perf_stat_succeeded(const stress_perf_t *sp);
 extern void perf_stat_dump(FILE *yaml, proc_info_t *procs_head, const double duration);
 extern void perf_init(void);
 #endif
-
-extern double time_now(void);
-extern const char *duration_to_str(const double duration);
 
 /* Misc settings helpers */
 extern void set_oom_adjustment(const char *name, const bool killable);
@@ -2426,8 +2439,8 @@ extern int mincore_touch_pages(void *buf, const size_t buf_len);
 extern void mount_free(char *mnts[], const int n);
 extern WARN_UNUSED int mount_get(char *mnts[], const int max);
 
+/* Thermal Zones */
 #if defined(STRESS_THERMAL_ZONES)
-/* thermal zones */
 extern int tz_init(tz_info_t **tz_info_list);
 extern void tz_free(tz_info_t **tz_info_list);
 extern int tz_get_temperatures(tz_info_t **tz_info_list, stress_tz_t *tz);
@@ -2465,7 +2478,7 @@ extern void free_cpu_caches(cpus_t *cpus);
 extern int  thrash_start(void);
 extern void thrash_stop(void);
 
-/* run-time checks to see if a stressor is supported or not */
+/* Run-Time checks to see if a stressor is supported or not */
 extern int stress_apparmor_supported(void);
 extern int stress_chroot_supported(void);
 extern int stress_cyclic_supported(void);
@@ -2590,6 +2603,7 @@ extern int  stress_set_wcs_method(const char *name);
 extern int  stress_set_zlib_method(const char *name);
 extern void stress_set_zombie_max(const char *opt);
 
+/* loff_t and off64_t porting shims */
 #if defined(__linux__)
 typedef	loff_t		shim_loff_t;	/* loff_t shim for linux */
 typedef off64_t		shim_off64_t;	/* off64_t for linux */
@@ -2609,6 +2623,7 @@ struct shim_linux_dirent {
 	char		d_name[];	/* Filename (null-terminated) */
 };
 
+/* dirent64 porting shim */
 struct shim_linux_dirent64 {
 #if defined(__linux__)
 	ino64_t		d_ino;		/* 64-bit inode number */
@@ -2829,6 +2844,7 @@ STRESS(stress_mincore);
 STRESS(stress_mknod);
 STRESS(stress_mlock);
 STRESS(stress_mmap);
+STRESS(stress_mmapaddr);
 STRESS(stress_mmapfork);
 STRESS(stress_mmapmany);
 STRESS(stress_mremap);
