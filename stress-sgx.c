@@ -38,7 +38,7 @@ int stress_sgx(const args_t *args)
 
 	printf("Will ECALL into enclave\n");
 	int ret;
-	status = ecall_stress_cpu(eid, &ret, method->name, args->max_ops);
+	status = ecall_stress_cpu(eid, &ret, method->name, args->max_ops, &g_keep_stressing_flag);
 	if (status != SGX_SUCCESS) {
 		print_error_message(status);
 		abort();

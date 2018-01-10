@@ -5,6 +5,6 @@ enclave {
     };
 
     trusted {
-    	    public int ecall_stress_cpu([in, string] const char* method_name, uint64_t rounds);
+    	    public int ecall_stress_cpu([in, string] const char* method_name, uint64_t rounds, [user_check] _Bool* g_keep_stressing_flag);
     };
 };
