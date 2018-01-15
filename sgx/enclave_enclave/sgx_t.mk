@@ -46,7 +46,7 @@ Crypto_Library_Name := sgx_tcrypto
 Enclave_C_Files := trusted/enclave.c
 Enclave_Include_Paths := -IInclude -Itrusted -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/libcxx
 
-Flags_Just_For_C := -Wno-implicit-function-declaration -std=c11
+Flags_Just_For_C := -Wno-implicit-function-declaration -std=gnu99
 Common_C_Cpp_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths) -fno-builtin-printf -I.
 Enclave_C_Flags := $(Flags_Just_For_C) $(Common_C_Cpp_Flags)
 

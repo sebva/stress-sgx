@@ -25,6 +25,7 @@
 #include "companion.h"
 
 uint64_t g_opt_flags;
+bool* g_keep_stressing_flag;
 
 #define GAMMA 		(0.57721566490153286060651209008240243104215933593992L)
 #define OMEGA		(0.56714329040978387299996866221035554975381578718651L)
@@ -117,6 +118,13 @@ static void HOT stress_cpu_sqrt(const char *name)
 	for (i = 0; i < 16384; i++) {
 		uint64_t rnd = mwc32();
 		double r = sqrt((double)rnd) * sqrt((double)rnd);
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) &&
+		    (uint64_t)rint(r) != rnd) {
+			pr_fail("%s: sqrt error detected on "
+				"sqrt(%" PRIu64 ")\n", name, rnd);
+			if (!g_keep_stressing_flag)
+				break;
+		}
 	}
 }
 
@@ -138,6 +146,10 @@ static void stress_cpu_loop(const char *name)
 		i_sum += i;
 		FORCE_DO_NOTHING();
 	}
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (i_sum != sum))
+		pr_fail("%s: cpu loop 0..16383 sum was %" PRIu32 " and "
+			"did not match the expected value of %" PRIu32 "\n",
+			name, i_sum, sum);
 }
 
 /*
@@ -218,6 +230,9 @@ static void HOT OPTIMIZE3 stress_cpu_bitops(const char *name)
 			i_sum += v;
 		}
 	}
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (i_sum != sum))
+		pr_fail("%s: bitops error detected, failed "
+			"bitops operations\n", name);
 }
 
 /*
@@ -305,6 +320,10 @@ static void HOT OPTIMIZE3 stress_cpu_rand(const char *name)
 	MWC_SEED();
 	for (i = 0; i < 16384; i++)
 		i_sum += mwc32();
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (i_sum != sum))
+		pr_fail("%s: rand error detected, failed sum of "
+			"pseudo-random values\n", name);
 }
 
 /*
@@ -332,6 +351,16 @@ static void HOT OPTIMIZE3 stress_cpu_nsqrt(const char *name)
 				lo = g;
 		}
 		rt = (lo + hi) / 2.0L;
+
+		if (g_opt_flags & OPT_FLAGS_VERIFY) {
+			if (j >= max_iter)
+				pr_fail("%s: Newton-Raphson sqrt "
+					"computation took more iterations "
+					"than expected\n", name);
+			if ((int)rintl(rt * rt) != i)
+				pr_fail("%s: Newton-Rapshon sqrt not "
+					"accurate enough\n", name);
+		}
 	}
 }
 
@@ -362,6 +391,11 @@ static void HOT OPTIMIZE3 stress_cpu_phi(const char *name)
 	}
 	/* And we have the golden ratio */
 	phi = (long double)b / (long double)a;
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) &&
+	    (fabsl(phi - phi_) > precision))
+		pr_fail("%s: Golden Ratio phi not accurate enough\n",
+			name);
 }
 
 /*
@@ -427,6 +461,10 @@ static void HOT OPTIMIZE3 stress_cpu_euler(const char *name)
 		n++;
 		e += (1.0L / fact);
 	} while ((n < 25) && (fabsl(e - last_e) > precision));
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (n >= 25))
+		pr_fail("%s: Euler computation took more iterations "
+			"than expected\n", name);
 }
 
 /*
@@ -475,6 +513,9 @@ static void stress_cpu_hash_generic(
 		buffer[i] = '\0';
 		i_sum += hash_func(buffer);
 	}
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (i_sum != result))
+		pr_fail("%s: %s error detected, failed hash %s sum\n",
+			name, hash_name, hash_name);
 }
 
 
@@ -515,6 +556,10 @@ static void stress_cpu_jenkin(const char *name)
 	random_buffer(buffer, sizeof(buffer));
 	for (i = 0; i < sizeof(buffer); i++)
 		i_sum += jenkin(buffer, sizeof(buffer));
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (i_sum != sum))
+		pr_fail("%s: jenkin error detected, failed hash "
+			"jenkin sum\n", name);
 }
 
 /*
@@ -665,6 +710,21 @@ static void HOT OPTIMIZE3 stress_cpu_idct(const char *name)
 			idct[i][j] = 0.25 * sum;
 		}
 	}
+	/* Final output should be a 8x8 matrix of values 255 */
+	if (g_opt_flags & OPT_FLAGS_VERIFY) {
+		for (i = 0; i < sz; i++) {
+			for (j = 0; j < sz; j++) {
+				if ((int)idct[i][j] != 255) {
+					pr_fail("%s: IDCT error detected, "
+						"IDCT[%d][%d] was %d, "
+						"expecting 255\n",
+						name, i, j, (int)idct[i][j]);
+				}
+			}
+			if (!g_keep_stressing_flag)
+				return;
+		}
+	}
 }
 
 #define int_ops(a, b, c1, c2, c3)	\
@@ -723,6 +783,11 @@ static void HOT OPTIMIZE3 stress_cpu_int ## _sz(const char *name)\
 		int_ops(a, b, c1, c2, c3)			\
 	}							\
 								\
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) &&			\
+	    ((a != a_final) || (b != b_final)))			\
+		pr_fail("%s: int" # _sz " error detected, " 	\
+			"failed int" # _sz 			\
+			" math operations\n", name);		\
 }								\
 
 /* For compilers that support int128 .. */
@@ -903,6 +968,11 @@ static void HOT OPTIMIZE3 stress_cpu_int ## _sz ## _ ## _name(const char *name)\
 		int_float_ops(_ftype, flt_a, flt_b, flt_c, flt_d,\
 			_sinf, _cosf, int_a, int_b, c1, c2, c3);\
 	}							\
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) &&			\
+	    ((int_a != a_final) || (int_b != b_final)))		\
+		pr_fail("%s: int" # _sz " error detected, "	\
+			"failed int" # _sz "" # _ftype		\
+			" math operations\n", name);		\
 								\
 	double_put(flt_a + flt_b + flt_c + flt_d);		\
 }
@@ -1048,6 +1118,10 @@ static void HOT OPTIMIZE3 stress_cpu_fibonacci(const char *name)
 		f1 = f2;
 		f2 = fn;
 	} while (!(fn & 0x8000000000000000ULL));
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (fn_res != fn))
+		pr_fail("%s: fibonacci error detected, summation "
+			"or assignment failure\n", name);
 }
 
 /*
@@ -1071,6 +1145,17 @@ static void HOT OPTIMIZE3 stress_cpu_psi(const char *name)
 		psi += 1.0L / f1;
 		i++;
 	} while ((i < max_iter) && (fabsl(psi - last_psi) > precision));
+
+	if (g_opt_flags & OPT_FLAGS_VERIFY) {
+		if (fabsl(psi - PSI) > 1.0e-15L)
+			pr_fail("%s: calculation of reciprocal "
+				"Fibonacci constant phi not as accurate "
+				"as expected\n", name);
+		if (i >= max_iter)
+			pr_fail("%s: calculation of reciprocal "
+				"Fibonacci constant took more iterations "
+				"than expected\n", name);
+	}
 
 	double_put(psi);
 }
@@ -1100,6 +1185,10 @@ static void HOT OPTIMIZE3 stress_cpu_ln2(const char *name)
 		ln2 -= (long double)1.0L / (long double)n++;
 	} while ((n < max_iter) && (fabsl(ln2 - last_ln2) > precision));
 
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (n >= max_iter))
+		pr_fail("%s: calculation of ln(2) took more "
+			"iterations than expected\n", name);
+
 	double_put(ln2);
 }
 
@@ -1124,6 +1213,10 @@ static uint32_t HOT ackermann(const uint32_t m, const uint32_t n)
 static void stress_cpu_ackermann(const char *name)
 {
 	uint32_t a = ackermann(3, 10);
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (a != 0x1ffd))
+		pr_fail("%s: ackermann error detected, "
+			"ackermann(3,10) miscalculated\n", name);
 }
 
 /*
@@ -1291,6 +1384,17 @@ static void HOT OPTIMIZE3 stress_cpu_gamma(const char *name)
 	} while (k < 1e6 && fabsl(gamma - gammaold) > precision);
 
 	double_put(gamma);
+
+	if (g_opt_flags & OPT_FLAGS_VERIFY) {
+		if (fabsl(gamma - GAMMA) > 1.0e-5L)
+			pr_fail("%s: calculation of Euler-Mascheroni "
+				"constant not as accurate as expected\n", name);
+		if (k > 80000.0L)
+			pr_fail("%s: calculation of Euler-Mascheroni "
+				"constant took more iterations than "
+				"expected\n", name);
+	}
+
 }
 
 /*
@@ -1361,6 +1465,10 @@ static void stress_cpu_prime(const char *name)
 		if (is_prime(i))
 			nprimes++;
 	}
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (nprimes != 78498))
+		pr_fail("%s: prime error detected, number of primes "
+			"between 0 and 1000000 miscalculated\n", name);
 }
 
 /*
@@ -1398,6 +1506,10 @@ static void HOT OPTIMIZE3 stress_cpu_gray(const char *name)
 #endif
 		sum += gray_code;
 	}
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (sum != 0xffff0000))
+		pr_fail("%s: gray code error detected, sum of gray "
+			"codes between 0x00000 and 0x10000 miscalculated\n",
+			name);
 }
 
 /*
@@ -1428,6 +1540,10 @@ static uint32_t HOT hanoi(
 static void stress_cpu_hanoi(const char *name)
 {
 	uint32_t n = hanoi(20, 'X', 'Y', 'Z');
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (n != 1048576))
+		pr_fail("%s: number of hanoi moves different from "
+			"the expected number\n", name);
 
 	uint64_put(n);
 }
@@ -1502,6 +1618,16 @@ static void HOT OPTIMIZE3 stress_cpu_pi(const char *name)
 		k++;
 	} while ((k < max_iter) && (fabsl(pi - last_pi) > precision));
 
+	/* Quick sanity checks */
+	if (g_opt_flags & OPT_FLAGS_VERIFY) {
+		if (k >= max_iter)
+			pr_fail("%s: number of iterations to compute "
+				"pi was more than expected\n", name);
+		if (fabsl(pi - M_PI) > 1.0e-15L)
+			pr_fail("%s: accuracy of computed pi is not "
+				"as good as expected\n", name);
+	}
+
 	double_put(pi);
 }
 
@@ -1523,6 +1649,15 @@ static void HOT OPTIMIZE3 stress_cpu_omega(const char *name)
 		omega = (1 + omega) / (1 + expl(omega));
 		n++;
 	} while ((n < max_iter) && (fabsl(omega - last_omega) > precision));
+
+	if (g_opt_flags & OPT_FLAGS_VERIFY) {
+		if (n >= max_iter)
+			pr_fail("%s: number of iterations to compute "
+				"omega was more than expected\n", name);
+		if (fabsl(omega - OMEGA) > 1.0e-16L)
+			pr_fail("%s: accuracy of computed omega is "
+				"not as good as expected\n", name);
+	}
 
 	double_put(omega);
 }
@@ -1605,6 +1740,10 @@ static void HOT OPTIMIZE3 stress_cpu_hamming(const char *name)
 			  (hamming84((i >> 0) & 0xf) << 0);
 		sum += encoded;
 	}
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (sum != 0xffff8000))
+		pr_fail("%s: hamming error detected, sum of 65536 "
+			"hamming codes not correct\n", name);
 }
 
 
@@ -1691,6 +1830,9 @@ static void stress_cpu_parity(const char *name)
 			p = !p;
 			v = v & (v - 1);
 		}
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) && (p != parity))
+			pr_fail("%s: parity error detected, using "
+				"optimised naive method\n",  name);
 
 		/*
 		 * "Compute parity of a word with a multiply"
@@ -1702,6 +1844,9 @@ static void stress_cpu_parity(const char *name)
 		v ^= v >> 2;
 		v = (v & 0x11111111U) * 0x11111111U;
 		p = (v >> 28) & 1;
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) && (p != parity))
+			pr_fail("%s: parity error detected, using the "
+				"multiply Shapira method\n",  name);
 
 		/*
 		 * "Compute parity in parallel"
@@ -1713,6 +1858,9 @@ static void stress_cpu_parity(const char *name)
 		v ^= v >> 4;
 		v &= 0xf;
 		p = (0x6996 >> v) & 1;
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) && (p != parity))
+			pr_fail("%s: parity error detected, using "
+				"the parallel method\n",  name);
 
 		/*
 		 * "Compute parity by lookup table"
@@ -1723,6 +1871,9 @@ static void stress_cpu_parity(const char *name)
 		v ^= v >> 16;
 		v ^= v >> 8;
 		p = stress_cpu_parity_table[v & 0xff];
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) && (p != parity))
+			pr_fail("%s: parity error detected, using "
+				"the lookup method, variation 1\n",  name);
 
 		/*
 		 * "Compute parity by lookup table"
@@ -1731,6 +1882,9 @@ static void stress_cpu_parity(const char *name)
 		 */
 		ptr = (uint8_t *)&val;
 		p = stress_cpu_parity_table[ptr[0] ^ ptr[1] ^ ptr[2] ^ ptr[3]];
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) && (p != parity))
+			pr_fail("%s: parity error detected, using the "
+				"lookup method, variation 1\n",  name);
 	}
 }
 
@@ -1904,6 +2058,11 @@ static void stress_cpu_queens(const char *name)
 
 	for (all = 1, n = 1; n < 13; n++) {
 		uint32_t solutions = queens_try(0, 0, 0, all);
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) &&
+		    (solutions != queens_solutions[n]))
+			pr_fail("%s: queens solution error detected "
+				"on board size %" PRIu32 "\n",
+				name, n);
 		all = (all + all) + 1;
 	}
 }
@@ -1926,11 +2085,22 @@ static void stress_cpu_factorial(const char *name)
 
 		f *= (double)n;
 
+		/* Stirling */
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) &&
+		    ((f - fact) / fact > precision)) {
+			pr_fail("%s: Stirling's approximation of factorial(%d) out of range\n",
+                                name, n);
+		}
 
 		/* Ramanujan */
 		dn = (double)n;
 		fact = sqrt_pi * powl((dn / M_E), dn);
 		fact *= powl((((((((8 * dn) + 4)) * dn) + 1) * dn) + 1.0/30.0), (1.0/6.0));
+		if ((g_opt_flags & OPT_FLAGS_VERIFY) &&
+		    ((f - fact) / fact > precision)) {
+			pr_fail("%s: Ramanujan's approximation of factorial(%d) out of range\n",
+                                name, n);
+		}
 	}
 }
 
@@ -1979,6 +2149,19 @@ static void stress_cpu_stats(const char *name)
 	double_put(gm);
 	double_put(hm);
 	double_put(stddev);
+
+	if (min > hm)
+		pr_fail("%s: stats: minimum %f > harmonic mean %f\n",
+			name, min, hm);
+	if (hm > gm)
+		pr_fail("%s: stats: harmonic mean %f > geometric mean %f\n",
+			name, hm, gm);
+	if (gm > am)
+		pr_fail("%s: stats: geometric mean %f > arithmetic mean %f\n",
+			name, gm, am);
+	if (am > max)
+		pr_fail("%s: stats: arithmetic mean %f > maxiumum %f\n",
+			name, am, max);
 }
 
 /*
