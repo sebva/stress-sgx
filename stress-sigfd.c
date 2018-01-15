@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@
  */
 #include "stress-ng.h"
 
-#if defined(__linux__) && NEED_GLIBC(2,8,0)
+#if defined(__linux__) && NEED_GLIBC(2,8,0) && defined(HAVE_SIGQUEUE)
 
 #include <sys/signalfd.h>
 

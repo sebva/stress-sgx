@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,13 +25,6 @@
 #include "stress-ng.h"
 
 #include <strings.h>
-#if defined(HAVE_LIB_BSD)
-#define HAVE_STRLCPY
-#define HAVE_STRLCAT
-#elif defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
-#define HAVE_STRLCPY
-#define HAVE_STRLCAT
-#endif
 
 /*
  *  the STR stress test has different classes of string stressors

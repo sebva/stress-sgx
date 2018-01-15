@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -148,8 +148,9 @@ int stress_physpage(const args_t *args)
 		inc_counter(args);
 	} while (keep_stressing());
 
+	if (fd_pc > 0)
+		(void)close(fd_pc);
 	(void)close(fd_pm);
-	(void)close(fd_pc);
 
 	return EXIT_SUCCESS;
 }

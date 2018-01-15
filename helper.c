@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2017 Canonical, Ltd.
+ * Copyright (C) 2014-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,11 +27,10 @@
 #include <libgen.h>
 #include <math.h>
 #if defined(__linux__)
-#include <sys/utsname.h>
 #include <sys/sysinfo.h>
 #include <sys/prctl.h>
 #endif
-#if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
+#if defined(HAVE_UNAME)
 #include <sys/utsname.h>
 #endif
 #include <sys/statvfs.h>
@@ -667,8 +666,10 @@ void stress_strnrnd(char *str, const size_t len)
  */
 void pr_yaml_runinfo(FILE *yaml)
 {
-#if defined(__linux__)
+#if defined(HAVE_UNAME)
 	struct utsname uts;
+#endif
+#if defined(__linux__)
 	struct sysinfo info;
 #endif
 	time_t t;
@@ -691,7 +692,7 @@ void pr_yaml_runinfo(FILE *yaml)
 	}
 	if (!gethostname(hostname, sizeof(hostname)))
 		pr_yaml(yaml, "      hostname: %s\n", hostname);
-#if defined(__linux__)
+#if defined(HAVE_UNAME)
 	if (uname(&uts) == 0) {
 		pr_yaml(yaml, "      sysname: %s\n", uts.sysname);
 		pr_yaml(yaml, "      nodename: %s\n", uts.nodename);
@@ -699,6 +700,8 @@ void pr_yaml_runinfo(FILE *yaml)
 		pr_yaml(yaml, "      version: %s\n", uts.version);
 		pr_yaml(yaml, "      machine: %s\n", uts.machine);
 	}
+#endif
+#if defined(__linux__)
 	if (sysinfo(&info) == 0) {
 		pr_yaml(yaml, "      uptime: %ld\n", info.uptime);
 		pr_yaml(yaml, "      totalram: %lu\n", info.totalram);
@@ -930,10 +933,7 @@ size_t stress_get_file_limit(void)
  */
 int stress_sigaltstack(const void *stack, const size_t size)
 {
-#if defined(__minix__)
-	(void)stack;
-	(void)size;
-#else
+#if defined(HAVE_SIGALTSTACK)
 	stack_t ss;
 
 	if (size < (KB * 4)) {
@@ -949,6 +949,9 @@ int stress_sigaltstack(const void *stack, const size_t size)
 			errno, strerror(errno));
 		return -1;
 	}
+#else
+	(void)stack;
+	(void)size;
 #endif
 	return 0;
 }
@@ -964,7 +967,7 @@ int stress_sighandler(
 	struct sigaction *orig_action)
 {
 	struct sigaction new_action;
-#if !defined(__gnu_hurd__) && !defined(__minix__)
+#if defined(HAVE_SIGALTSTACK)
 	static bool set_altstack = false;
 
 	/*
@@ -1058,7 +1061,7 @@ unsigned int stress_get_cpu(void)
  */
 int stress_not_implemented(const args_t *args)
 {
-#if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
+#if defined(HAVE_UNAME)
 	struct utsname buf;
 
 	if (!uname(&buf)) {

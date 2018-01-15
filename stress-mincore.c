@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@
  */
 #include "stress-ng.h"
 
-#if !defined(__gnu_hurd__) && NEED_GLIBC(2,2,0)
+#if defined(HAVE_MINCORE) && NEED_GLIBC(2,2,0)
 
 #define VEC_MAX_SIZE 	(64)
 
@@ -57,7 +57,7 @@ redo: 			errno = 0;
 						goto redo;
 					/* fall through */
 				default:
-					pr_fail("%s: mincore on address %p error: %d %s\n ",
+					pr_fail("%s: mincore on address %p error: %d %s\n",
 						args->name, addr, errno,
 						strerror(errno));
 					return EXIT_FAILURE;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,8 +27,10 @@
 #include <getopt.h>
 #include <syslog.h>
 
-#if defined(__linux__)
+#if defined(HAVE_UNAME)
 #include <sys/utsname.h>
+#endif
+#if defined(__linux__)
 #include <sys/sysinfo.h>
 #endif
 
@@ -79,7 +81,7 @@ const char *g_app_name = "stress-ng";		/* Name of application */
 shared_t *g_shared;				/* shared memory */
 int g_signum;					/* signal sent to process */
 jmp_buf g_error_env;				/* parsing error env */
-
+put_val_t g_put_val;				/* sync data to somewhere */
 
 /*
  *  stressors to be run-time checked to see if they are supported
@@ -95,6 +97,7 @@ static const unsupported_t unsupported[] = {
 	{ STRESS_IOPORT,	stress_ioport_supported },
 	{ STRESS_NETLINK_PROC,	stress_netlink_proc_supported },
 	{ STRESS_PHYSPAGE,	stress_physpage_supported },
+	{ STRESS_RAWDEV,	stress_rawdev_supported },
 	{ STRESS_RDRAND,	stress_rdrand_supported },
 	{ STRESS_SGX,		stress_sgx_supported },
 	{ STRESS_SOFTLOCKUP,	stress_softlockup_supported },
@@ -133,6 +136,7 @@ static const proc_helper_t proc_destroy[] = {
  */
 static const stressor_default_t stressor_default[] = {
 	{ "all",	stress_set_cpu_method },
+	{ "uint64",	stress_set_funccall_method },
 	{ "all",	stress_set_str_method },
 	{ "all",	stress_set_wcs_method },
 	{ "all",	stress_set_matrix_method },
@@ -252,6 +256,8 @@ static const stress_t stressors[] = {
 	STRESSOR(fp_error, FP_ERROR, CLASS_CPU),
 	STRESSOR(fstat, FSTAT, CLASS_FILESYSTEM | CLASS_OS),
 	STRESSOR(full, FULL, CLASS_DEV | CLASS_MEMORY | CLASS_OS),
+	STRESSOR(funccall, FUNCCALL, CLASS_CPU),
+	STRESSOR(futex, FUTEX, CLASS_SCHEDULER | CLASS_OS),
 	STRESSOR(futex, FUTEX, CLASS_SCHEDULER | CLASS_OS),
 	STRESSOR(get, GET, CLASS_OS),
 	STRESSOR(getdent, GETDENT, CLASS_FILESYSTEM | CLASS_OS),
@@ -322,6 +328,7 @@ static const stress_t stressors[] = {
 	STRESSOR(qsort, QSORT, CLASS_CPU_CACHE | CLASS_CPU | CLASS_MEMORY),
 	STRESSOR(quota, QUOTA, CLASS_OS),
 	STRESSOR(radixsort, RADIXSORT, CLASS_CPU_CACHE | CLASS_CPU | CLASS_MEMORY),
+	STRESSOR(rawdev, RAWDEV, CLASS_IO),
 	STRESSOR(rdrand, RDRAND, CLASS_CPU),
 	STRESSOR(readahead, READAHEAD, CLASS_IO | CLASS_OS),
 	STRESSOR(remap, REMAP_FILE_PAGES, CLASS_MEMORY | CLASS_OS),
@@ -370,6 +377,7 @@ static const stress_t stressors[] = {
 	STRESSOR(timerfd, TIMERFD, CLASS_INTERRUPT | CLASS_OS),
 	STRESSOR(tlb_shootdown, TLB_SHOOTDOWN, CLASS_OS | CLASS_MEMORY),
 	STRESSOR(tmpfs, TMPFS, CLASS_MEMORY | CLASS_VM | CLASS_OS),
+	STRESSOR(tree, TREE, CLASS_CPU_CACHE | CLASS_CPU | CLASS_MEMORY),
 	STRESSOR(tsc, TSC, CLASS_CPU),
 	STRESSOR(tsearch, TSEARCH, CLASS_CPU_CACHE | CLASS_CPU | CLASS_MEMORY),
 	STRESSOR(udp, UDP, CLASS_NETWORK | CLASS_OS),
@@ -558,6 +566,9 @@ static const struct option long_options[] = {
 	{ "fstat-dir",	1,	0,	OPT_FSTAT_DIR },
 	{ "full",	1,	0,	OPT_FULL },
 	{ "full-ops",	1,	0,	OPT_FULL_OPS },
+	{ "funccall",	1,	0,	OPT_FUNCCALL },
+	{ "funccall-ops",1,	0,	OPT_FUNCCALL_OPS },
+	{ "funccall-method",1,	0,	OPT_FUNCCALL_METHOD },
 	{ "futex",	1,	0,	OPT_FUTEX },
 	{ "futex-ops",	1,	0,	OPT_FUTEX_OPS },
 	{ "get",	1,	0,	OPT_GET },
@@ -758,6 +769,9 @@ static const struct option long_options[] = {
 	{ "radixsort",	1,	0,	OPT_RADIXSORT },
 	{ "radixsort-ops",1,	0,	OPT_RADIXSORT_OPS },
 	{ "radixsort-size",1,	0,	OPT_RADIXSORT_SIZE },
+	{ "rawdev",	1,	0,	OPT_RAWDEV },
+	{ "rawdev-ops",1,	0,	OPT_RAWDEV_OPS },
+	{ "rawdev-method",1,	0,	OPT_RAWDEV_METHOD },
 	{ "random",	1,	0,	OPT_RANDOM },
 	{ "rdrand",	1,	0,	OPT_RDRAND },
 	{ "rdrand-ops",	1,	0,	OPT_RDRAND_OPS },
@@ -892,6 +906,10 @@ static const struct option long_options[] = {
 	{ "tlb-shootdown-ops",1,0,	OPT_TLB_SHOOTDOWN_OPS },
 	{ "tmpfs",	1,	0,	OPT_TMPFS },
 	{ "tmpfs-ops",	1,	0,	OPT_TMPFS_OPS },
+	{ "tree",	1,	0,	OPT_TREE },
+	{ "tree-ops",	1,	0,	OPT_TREE_OPS },
+	{ "tree-method",1,	0,	OPT_TREE_METHOD },
+	{ "tree-size",	1,	0,	OPT_TREE_SIZE },
 	{ "tsc",	1,	0,	OPT_TSC },
 	{ "tsc-ops",	1,	0,	OPT_TSC_OPS },
 	{ "tsearch",	1,	0,	OPT_TSEARCH },
@@ -1161,6 +1179,9 @@ static const help_t help_stressors[] = {
 	{ NULL,		"fstat-dir path",	"fstat files in the specified directory" },
 	{ NULL,		"full N",		"start N workers exercising /dev/full" },
 	{ NULL,		"full-ops N",		"stop after N /dev/full bogo I/O operations" },
+	{ NULL,		"funccall N",		"start N workers exercising 1 to 9 arg functions" },
+	{ NULL,		"funccall-ops N",	"stop after N function call bogo operations" },
+	{ NULL,		"funccall-method M",	"select function call method M" },
 	{ NULL,		"futex N",		"start N workers exercising a fast mutex" },
 	{ NULL,		"futex-ops N",		"stop after N fast mutex bogo operations" },
 	{ NULL,		"get N",		"start N workers exercising the get*() system calls" },
@@ -1333,6 +1354,9 @@ static const help_t help_stressors[] = {
 	{ NULL,		"radixsort N",		"start N workers radix sorting random strings" },
 	{ NULL,		"radixsort-ops N",	"stop after N radixsort bogo operations" },
 	{ NULL,		"radixsort-size N",	"number of strings to sort" },
+	{ NULL,		"rawdev N",		"start N workers that read a raw device" },
+	{ NULL,		"rawdev-ops N",		"stop after N rawdev read operations" },
+	{ NULL,		"rawdev-method M",	"specify the rawdev reead method to use" },
 	{ NULL,		"rdrand N",		"start N workers exercising rdrand (x86 only)" },
 	{ NULL,		"rdrand-ops N",		"stop after N rdrand bogo operations" },
 	{ NULL,		"readahead N",		"start N workers exercising file readahead" },
@@ -1457,6 +1481,10 @@ static const help_t help_stressors[] = {
 	{ NULL,		"tlb-shootdown-ops N",	"stop after N TLB shootdown bogo ops" },
 	{ NULL,		"tmpfs N",		"start N workers mmap'ing a file on tmpfs" },
 	{ NULL,		"tmpfs-ops N",		"stop after N tmpfs bogo ops" },
+	{ NULL,		"tree N",		"start N workers that exercise tree structures" },
+	{ NULL,		"tree-ops N",		"stop after N bogo tree operations" },
+	{ NULL,		"tree-method M",	"select tree method, all,avl,binary,rb,splay" },
+	{ NULL,		"tree-size N",		"N is the number of items in the tree" },
 	{ NULL,		"tsc N",		"start N workers reading the TSC (x86 only)" },
 	{ NULL,		"tsc-ops N",		"stop after N TSC bogo operations" },
 	{ NULL,		"tsearch N",		"start N workers that exercise a tree search" },
@@ -2525,10 +2553,9 @@ void log_system_mem_info(void)
  */
 static void log_system_info(void)
 {
-#if defined(__linux__)
+#if defined(HAVE_UNAME)
 	struct utsname buf;
-#endif
-#if defined(__linux__)
+
 	if (uname(&buf) == 0) {
 		syslog(LOG_INFO, "system: '%s' %s %s %s %s\n",
 			buf.nodename,
@@ -3046,6 +3073,10 @@ next_opt:
 		case OPT_FSTAT_DIR:
 			stress_set_fstat_dir(optarg);
 			break;
+		case OPT_FUNCCALL_METHOD:
+			if (stress_set_funccall_method(optarg) < 0)
+				return EXIT_FAILURE;
+			break;
 		case OPT_HELP:
 			usage();
 			break;
@@ -3241,6 +3272,10 @@ next_opt:
 			stress_get_processors(&i32);
 			set_setting("random", TYPE_ID_INT32, &i32);
 			break;
+		case OPT_RAWDEV_METHOD:
+			if (stress_set_rawdev_method(optarg) < 0)
+				return EXIT_FAILURE;
+			break;
 		case OPT_READAHEAD_BYTES:
 			stress_set_readahead_bytes(optarg);
 			break;
@@ -3375,6 +3410,13 @@ next_opt:
 			break;
 		case OPT_TIMES:
 			g_opt_flags |= OPT_FLAGS_TIMES;
+			break;
+		case OPT_TREE_METHOD:
+			if (stress_set_tree_method(optarg) < 0)
+				return EXIT_FAILURE;
+			break;
+		case OPT_TREE_SIZE:
+			stress_set_tree_size(optarg);
 			break;
 		case OPT_TSEARCH_SIZE:
 			stress_set_tsearch_size(optarg);

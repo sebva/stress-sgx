@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -183,7 +183,7 @@ static void stress_dir_exercise(
 #endif
 				/* Occasional flushing */
 				if (rnd >= 0xfff0) {
-#if defined(__linux__) && NEED_GLIBC(2,14,0)
+#if defined(HAVE_SYNCFS)
 					(void)syncfs(fd);
 #else
 					(void)sync();

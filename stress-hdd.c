@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -80,7 +80,7 @@ static const hdd_opts_t hdd_opts[] = {
 #if defined(O_NOATIME)
 	{ "noatime",	HDD_OPT_O_NOATIME, 0, 0, O_NOATIME },
 #endif
-#if defined(POSIX_FADV_NORMAL) && !defined(__gnu_hurd__)
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_NORMAL)
 	{ "wr-seq",	HDD_OPT_WR_SEQ, HDD_OPT_WR_RND, 0, 0 },
 	{ "wr-rnd",	HDD_OPT_WR_RND, HDD_OPT_WR_SEQ, 0, 0 },
 	{ "rd-seq",	HDD_OPT_RD_SEQ, HDD_OPT_RD_RND, 0, 0 },
@@ -91,39 +91,39 @@ static const hdd_opts_t hdd_opts[] = {
 		 HDD_OPT_FADV_DONTNEED),
 		POSIX_FADV_NORMAL, 0 },
 #endif
-#if defined(POSIX_FADV_SEQ) && !defined(__gnu_hurd__)
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_SEQ)
 	{ "fadv-seq",	HDD_OPT_FADV_SEQ,
 		(HDD_OPT_FADV_NORMAL | HDD_OPT_FADV_RND),
 		POSIX_FADV_SEQUENTIAL, 0 },
 #endif
-#if defined(POSIX_FADV_RANDOM) && !defined(__gnu_hurd__)
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_RANDOM)
 	{ "fadv-rnd",	HDD_OPT_FADV_RND,
 		(HDD_OPT_FADV_NORMAL | HDD_OPT_FADV_SEQ),
 		POSIX_FADV_RANDOM, 0 },
 #endif
-#if defined(POSIX_FADV_NOREUSE) && !defined(__gnu_hurd__)
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_NOREUSE)
 	{ "fadv-noreuse", HDD_OPT_FADV_NOREUSE,
 		HDD_OPT_FADV_NORMAL,
 		POSIX_FADV_NOREUSE, 0 },
 #endif
-#if defined(POSIX_FADV_WILLNEED) && !defined(__gnu_hurd__)
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_WILLNEED)
 	{ "fadv-willneed", HDD_OPT_FADV_WILLNEED,
 		(HDD_OPT_FADV_NORMAL | HDD_OPT_FADV_DONTNEED),
 		POSIX_FADV_WILLNEED, 0 },
 #endif
-#if defined(POSIX_FADV_DONTNEED) && !defined(__gnu_hurd__)
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
 	{ "fadv-dontneed", HDD_OPT_FADV_DONTNEED,
 		(HDD_OPT_FADV_NORMAL | HDD_OPT_FADV_WILLNEED),
 		POSIX_FADV_DONTNEED, 0 },
 #endif
-#if _BSD_SOURCE || _XOPEN_SOURCE || _POSIX_C_SOURCE >= 200112L
+#if defined(HAVE_FSYNC)
 	{ "fsync",	HDD_OPT_FSYNC, 0, 0, 0 },
 #endif
-#if _POSIX_C_SOURCE >= 199309L || _XOPEN_SOURCE >= 500
+#if defined(HAVE_FDATASYNC)
 	{ "fdatasync",	HDD_OPT_FDATASYNC, 0, 0, 0 },
 #endif
 	{ "iovec",	HDD_OPT_IOVEC, 0, 0, 0 },
-#if NEED_GLIBC(2,14,0) && defined(__linux__)
+#if defined(HAVE_SYNCFS)
 	{ "syncfs",	HDD_OPT_SYNCFS, 0, 0, 0 },
 #endif
 	{ "utimes",	HDD_OPT_UTIMES, 0, 0, 0 },
@@ -162,7 +162,7 @@ static ssize_t stress_hdd_write(
 {
 	ssize_t ret;
 
-#if !defined(__sun__)
+#if defined(HAVE_FUTIMES)
 	if (hdd_flags & HDD_OPT_UTIMES)
 		(void)futimes(fd, NULL);
 #endif
@@ -184,15 +184,15 @@ static ssize_t stress_hdd_write(
 		ret = write(fd, buf, count);
 	}
 
-#if _BSD_SOURCE || _XOPEN_SOURCE || _POSIX_C_SOURCE >= 200112L
+#if defined(HAVE_FSYNC)
 	if (hdd_flags & HDD_OPT_FSYNC)
 		(void)fsync(fd);
 #endif
-#if _POSIX_C_SOURCE >= 199309L || _XOPEN_SOURCE >= 500
+#if defined(HAVE_FDATASYNC)
 	if (hdd_flags & HDD_OPT_FDATASYNC)
 		(void)fdatasync(fd);
 #endif
-#if NEED_GLIBC(2,14,0) && defined(__linux__)
+#if defined(HAVE_SYNCFS)
 	if (hdd_flags & HDD_OPT_SYNCFS)
 		(void)syncfs(fd);
 #endif
@@ -211,7 +211,7 @@ static ssize_t stress_hdd_read(
 	const uint64_t hdd_write_size,
 	const int hdd_flags)
 {
-#if !defined(__sun__)
+#if defined(HAVE_FUTIMES)
 	if (hdd_flags & HDD_OPT_UTIMES)
 		(void)futimes(fd, NULL);
 #endif
@@ -299,8 +299,7 @@ static int stress_hdd_advise(const args_t *args, const int fd, const int flags)
 {
 #if (defined(POSIX_FADV_SEQ) || defined(POSIX_FADV_RANDOM) || \
     defined(POSIX_FADV_NOREUSE) || defined(POSIX_FADV_WILLNEED) || \
-    defined(POSIX_FADV_DONTNEED)) && !defined(__gnu_hurd__) && \
-    !defined(__minix__)
+    defined(POSIX_FADV_DONTNEED)) && defined(HAVE_POSIX_FADVISE)
 	size_t i;
 
 	if (!(flags & HDD_OPT_FADV_MASK))
@@ -408,16 +407,7 @@ int stress_hdd(const args_t *args)
 	if ((hdd_flags & HDD_OPT_RD_MASK) == 0)
 		hdd_flags |= HDD_OPT_RD_SEQ;
 
-#if defined(__sun__)
-	/* Work around lack of posix_memalign */
-	alloc_buf = malloc((size_t)hdd_write_size + BUF_ALIGNMENT);
-	if (!alloc_buf) {
-		pr_err("%s: cannot allocate buffer\n", args->name);
-		(void)stress_temp_dir_rm_args(args);
-		return rc;
-	}
-	buf = (uint8_t *)align_address(alloc_buf, BUF_ALIGNMENT);
-#else
+#if defined(HAVE_POSIX_MEMALIGN)
 	ret = posix_memalign((void **)&alloc_buf, BUF_ALIGNMENT, (size_t)hdd_write_size);
 	if (ret || !alloc_buf) {
 		rc = exit_status(errno);
@@ -426,6 +416,15 @@ int stress_hdd(const args_t *args)
 		return rc;
 	}
 	buf = alloc_buf;
+#else
+	/* Work around lack of posix_memalign */
+	alloc_buf = malloc((size_t)hdd_write_size + BUF_ALIGNMENT);
+	if (!alloc_buf) {
+		pr_err("%s: cannot allocate buffer\n", args->name);
+		(void)stress_temp_dir_rm_args(args);
+		return rc;
+	}
+	buf = (uint8_t *)align_address(alloc_buf, BUF_ALIGNMENT);
 #endif
 
 	stress_strnrnd((char *)buf, hdd_write_size);

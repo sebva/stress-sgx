@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2017 Canonical, Ltd.
+ * Copyright (C) 2014-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -603,7 +603,7 @@ int shim_mlock2(const void *addr, size_t len, int flags)
  */
 int shim_mlockall(int flags)
 {
-#if !defined(__gnu_hurd__) && !defined(__minix__)
+#if defined(HAVE_MLOCKALL)
 	return mlockall(flags);
 #else
 	(void)flags;
@@ -619,7 +619,8 @@ int shim_mlockall(int flags)
  */
 int shim_munlockall(void)
 {
-#if !defined(__gnu_hurd__) && !defined(__minix__)
+/* if HAVE_MLOCKALL defined we also have munlockall */
+#if defined(HAVE_MLOCKALL)
 	return munlockall();
 #else
 	errno = ENOSYS;
@@ -700,7 +701,7 @@ char *shim_getlogin(void)
  */
 int shim_msync(void *addr, size_t length, int flags)
 {
-#if !defined(__gnu_hurd__) && !defined(__minix__)
+#if defined(HAVE_MSYNC)
 	return msync(addr, length, flags);
 #else
 	(void)addr;
@@ -813,7 +814,7 @@ int shim_madvise(void *addr, size_t length, int advice)
  */
 int shim_mincore(void *addr, size_t length, unsigned char *vec)
 {
-#if !defined(__gnu_hurd__) && NEED_GLIBC(2,2,0)
+#if defined(HAVE_MINCORE) && NEED_GLIBC(2,2,0)
 #if defined(__FreeBSD__) || defined(__OpenBSD__) || \
     defined(__NetBSD__) || defined(__sun__)
 	return mincore(addr, length, (char *)vec);
@@ -902,10 +903,10 @@ int shim_futex_wait(
  *  dup3()
  *	linux special dup
  */
-#if defined(__linux__) && defined(__NR_dup3)
+#if defined(HAVE_DUP3)
 int shim_dup3(int oldfd, int newfd, int flags)
 {
-	return syscall(__NR_dup3, oldfd, newfd, flags);
+	return dup3(oldfd, newfd, flags);
 }
 #else
 int shim_dup3(int oldfd, int newfd, int flags)

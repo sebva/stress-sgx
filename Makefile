@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2013-2017 Canonical, Ltd.
+# Copyright (C) 2013-2018 Canonical, Ltd.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,9 +16,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 
-VERSION=0.09.04
+VERSION=0.09.10
 #
-# Codename "harmful hardware harasser"
+# Codename "portable pressure producer"
 #
 
 CFLAGS += -Wall -Wextra -DVERSION='"$(VERSION)"' -O2 -std=gnu99
@@ -91,17 +91,18 @@ STRESS_SRC = \
 	stress-eventfd.c \
 	stress-exec.c \
 	stress-fallocate.c \
+	stress-fanotify.c \
 	stress-fault.c \
 	stress-fcntl.c \
 	stress-fiemap.c \
 	stress-fifo.c \
 	stress-filename.c \
 	stress-flock.c \
-	stress-fanotify.c \
 	stress-fork.c \
 	stress-fp-error.c \
 	stress-fstat.c \
 	stress-full.c \
+	stress-funccall.c \
 	stress-futex.c \
 	stress-get.c \
 	stress-getrandom.c \
@@ -172,6 +173,7 @@ STRESS_SRC = \
 	stress-quota.c \
 	stress-qsort.c \
 	stress-radixsort.c \
+	stress-rawdev.c \
 	stress-rdrand.c \
 	stress-readahead.c \
 	stress-remap-file-pages.c \
@@ -219,6 +221,7 @@ STRESS_SRC = \
 	stress-timerfd.c \
 	stress-tlb-shootdown.c \
 	stress-tmpfs.c \
+	stress-tree.c \
 	stress-tsc.c \
 	stress-tsearch.c \
 	stress-udp.c \
@@ -367,9 +370,9 @@ dist:
 	cp -rp Makefile Makefile.config $(SRC) stress-ng.h stress-ng.1 \
 		personality.c COPYING syscalls.txt mascot README \
 		README.Android test snapcraft smatchify.sh config TODO \
-		perf-event.c usr.bin.pulseaudio.eg \
+		perf-event.c usr.bin.pulseaudio.eg stress-version.h \
 		example-jobs stress-ng-$(VERSION)
-	tar -zcf stress-ng-$(VERSION).tar.gz stress-ng-$(VERSION)
+	tar -Jcf stress-ng-$(VERSION).tar.xz stress-ng-$(VERSION)
 	rm -rf stress-ng-$(VERSION)
 
 .PHONY: pdf
@@ -381,7 +384,7 @@ pdf:
 clean:
 	$(MAKE) -f sgx/Makefile clean
 	@rm -f stress-ng $(OBJS) stress-ng.1.gz stress-ng.pdf
-	@rm -f stress-ng-$(VERSION).tar.gz
+	@rm -f stress-ng-$(VERSION).tar.xz
 	@rm -f personality.h
 	@rm -f perf-event.h
 	@rm -f *.o

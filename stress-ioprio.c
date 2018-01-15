@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -38,7 +38,9 @@
 int stress_ioprio(const args_t *args)
 {
 	const uid_t uid = getuid();
+#if defined(HAVE_GETPGRP)
 	const pid_t grp = getpgrp();
+#endif
 	int fd, rc = EXIT_FAILURE;
 	char filename[PATH_MAX];
 
@@ -72,12 +74,14 @@ int stress_ioprio(const args_t *args)
 				args->name, errno, strerror(errno));
 			goto cleanup_file;
 		}
+#if defined(HAVE_GETPGRP)
 		if (shim_ioprio_get(IOPRIO_WHO_PGRP, grp) < 0) {
 			pr_fail("%s: ioprio_get(OPRIO_WHO_PGRP, %d), "
 				"errno = %d (%s)\n",
 				args->name, g_pgrp, errno, strerror(errno));
 			goto cleanup_file;
 		}
+#endif
 		if (shim_ioprio_get(IOPRIO_WHO_PGRP, 0) < 0) {
 			pr_fail("%s: ioprio_get(OPRIO_WHO_PGRP, 0), "
 				"errno = %d (%s)\n",

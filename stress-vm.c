@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -92,7 +92,7 @@ static const vm_madvise_info_t vm_madvise_info[] = {
  *  keep_stressing()
  *	returns true if we can keep on running a stressor
  */
-bool HOT OPTIMIZE3 keep_stressing_vm(const args_t *args)
+static bool HOT OPTIMIZE3 keep_stressing_vm(const args_t *args)
 {
 	return (LIKELY(g_keep_stressing_flag) &&
 	        LIKELY(!args->max_ops || ((*args->counter >> VM_BOGO_SHIFT) < args->max_ops)));
@@ -526,9 +526,7 @@ static size_t stress_vm_walking_one_addr(
 		for (mask = 1, i = 1; i < 64; i++) {
 			uintptr_t uintptr = ((uintptr_t)ptr) ^ mask;
 			uint8_t *addr = (uint8_t *)uintptr;
-			if (addr == ptr)
-				continue;
-			if (addr < buf || addr >= buf_end || addr == ptr)
+			if ((addr < buf) || (addr >= buf_end) || (addr == ptr))
 				continue;
 			*addr = d2;
 			tests++;

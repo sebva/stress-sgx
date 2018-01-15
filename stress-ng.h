@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -58,11 +58,30 @@
 #if defined(HAVE_LIB_PTHREAD)
 #include <pthread.h>
 #endif
-#if defined(HAVE_LIB_BSD) && !defined(__APPLE__)
-#include <bsd/stdlib.h>
-#include <bsd/string.h>
+
+#if defined(HAVE_BSD_WCHAR)
 #include <bsd/wchar.h>
 #endif
+#if defined(HAVE_WCHAR)
+#include <wchar.h>
+#endif
+
+#if defined(HAVE_LIB_BSD)
+#if defined(__APPLE__) || \
+    defined(__DragonFly__) || \
+    defined(__FreeBSD__) || \
+    defined(__NetBSD__) || \
+    defined(__OpenBSD__)
+#if !defined(__APPLE__)
+#include <sys/tree.h>
+#endif
+#else
+#include <bsd/stdlib.h>
+#include <bsd/string.h>
+#include <bsd/sys/tree.h>
+#endif
+#endif
+
 #include <signal.h>
 #include <time.h>
 #include <sys/file.h>
@@ -102,6 +121,8 @@
 #include <alloca.h>
 #include <strings.h>
 #endif
+
+#include "stress-version.h"
 
 #if defined (__linux__)
 /*
@@ -143,28 +164,6 @@ typedef unsigned long int __kernel_ulong_t;
 
 #define STRESS_MINIMUM(a,b) (((a) < (b)) ? (a) : (b))
 #define STRESS_MAXIMUM(a,b) (((a) > (b)) ? (a) : (b))
-
-#define _VER_(major, minor, patchlevel)			\
-	((major * 10000) + (minor * 100) + patchlevel)
-
-#if defined(__GLIBC__) && defined(__GLIBC_MINOR__)
-#define NEED_GLIBC(major, minor, patchlevel) 			\
-	_VER_(major, minor, patchlevel) <= _VER_(__GLIBC__, __GLIBC_MINOR__, 0)
-#else
-#define NEED_GLIBC(major, minor, patchlevel) 	(0)
-#endif
-
-#if defined(__GNUC__) && defined(__GNUC_MINOR__)
-#if defined(__GNUC_PATCHLEVEL__)
-#define NEED_GNUC(major, minor, patchlevel) 			\
-	_VER_(major, minor, patchlevel) <= _VER_(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__)
-#else
-#define NEED_GNUC(major, minor, patchlevel) 			\
-	_VER_(major, minor, patchlevel) <= _VER_(__GNUC__, __GNUC_MINOR__, 0)
-#endif
-#else
-#define NEED_GNUC(major, minor, patchlevel) 	(0)
-#endif
 
 /* NetBSD does not define MAP_ANONYMOUS */
 #if defined(MAP_ANON) && !defined(MAP_ANONYMOUS)
@@ -369,6 +368,19 @@ typedef struct setting {
 	} u;
 } setting_t;
 
+typedef union {
+	volatile uint8_t	uint8_val;
+	volatile uint16_t	uint16_val;
+	volatile uint32_t	uint32_val;
+	volatile uint64_t	uint64_val;
+#if defined(STRESS_INT128)
+	volatile __uint128_t	uint128_val;
+#endif
+	volatile float		float_val;
+	volatile double		double_val;
+	volatile long double	long_double_val;
+} put_val_t;
+
 /* Network domains flags */
 #define DOMAIN_INET		0x00000001	/* AF_INET */
 #define DOMAIN_INET6		0x00000002	/* AF_INET6 */
@@ -445,6 +457,13 @@ typedef struct {
 #define OPTIMIZE1
 #endif
 
+/* -O0 attribute support */
+#if defined(__GNUC__) && !defined(__clang__) && NEED_GNUC(4,6,0)
+#define OPTIMIZE0 	__attribute__((optimize("-O0")))
+#else
+#define OPTIMIZE0
+#endif
+
 /* warn unused attribute */
 #if defined(__GNUC__) && NEED_GNUC(4,2,0)
 #define WARN_UNUSED	__attribute__((warn_unused_result))
@@ -452,18 +471,26 @@ typedef struct {
 #define WARN_UNUSED
 #endif
 
+#if defined(__GNUC__) && NEED_GNUC(3,3,0)
+#define ALIGNED(a)	__attribute__((aligned(a)))
+#endif
+
 /* Force aligment to nearest 128 bytes */
 #if defined(__GNUC__) && NEED_GNUC(3,3,0) && defined(HAVE_ALIGNED_128)
-#define ALIGN128	__attribute__ ((aligned(128)))
+#define ALIGN128	ALIGNED(128)
 #else
 #define ALIGN128
 #endif
 
 /* Force aligment to nearest 64 bytes */
 #if defined(__GNUC__) && NEED_GNUC(3,3,0) && defined(HAVE_ALIGNED_64)
-#define ALIGN64		__attribute__ ((aligned(64)))
+#define ALIGN64		ALIGNED(64)
 #else
 #define ALIGN64
+#endif
+
+#if defined(__GNUC__) && NEED_GNUC(4,6,0)
+#define SECTION(s)	__attribute__((__section__(# s)))
 #endif
 
 /* Choose cacheline alignment */
@@ -524,9 +551,9 @@ typedef struct {
 
 /* Logging helpers */
 extern int pr_msg(FILE *fp, const uint64_t flag,
-	const char *const fmt, va_list va);
+	const char *const fmt, va_list va) FORMAT(printf, 3, 0);
 extern void pr_msg_fail(const uint64_t flag, const char *name, const char *what, const int err);
-extern int pr_yaml(FILE *fp, const char *const fmt, ...) __attribute__((format(printf, 2, 3)));
+extern int pr_yaml(FILE *fp, const char *const fmt, ...) FORMAT(printf, 2, 3);
 extern void pr_yaml_runinfo(FILE *fp);
 extern void pr_openlog(const char *filename);
 extern void pr_closelog(void);
@@ -849,10 +876,6 @@ extern void pr_fail_dbg__(const args_t *args, const char *msg);
 #endif
 #define DEFAULT_SYNC_FILE_BYTES	(1 * GB)
 
-#define MIN_TSEARCH_SIZE	(1 * KB)
-#define MAX_TSEARCH_SIZE	(4 * MB)
-#define DEFAULT_TSEARCH_SIZE	(64 * KB)
-
 #define MIN_TIMER_FREQ		(1)
 #define MAX_TIMER_FREQ		(100000000)
 #define DEFAULT_TIMER_FREQ	(1000000)
@@ -860,6 +883,14 @@ extern void pr_fail_dbg__(const args_t *args, const char *msg);
 #define MIN_TIMERFD_FREQ	(1)
 #define MAX_TIMERFD_FREQ	(100000000)
 #define DEFAULT_TIMERFD_FREQ	(1000000)
+
+#define MIN_TREE_SIZE		(1000)
+#define MAX_TREE_SIZE		(25000000)
+#define DEFAULT_TREE_SIZE	(250000)
+
+#define MIN_TSEARCH_SIZE	(1 * KB)
+#define MAX_TSEARCH_SIZE	(4 * MB)
+#define DEFAULT_TSEARCH_SIZE	(64 * KB)
 
 #define MIN_UDP_PORT		(1024)
 #define MAX_UDP_PORT		(65535)
@@ -1198,17 +1229,18 @@ typedef enum {
 	STRESS_EVENTFD,
 	STRESS_EXEC,
 	STRESS_FALLOCATE,
+	STRESS_FANOTIFY,
 	STRESS_FAULT,
 	STRESS_FCNTL,
 	STRESS_FIEMAP,
 	STRESS_FIFO,
 	STRESS_FILENAME,
 	STRESS_FLOCK,
-	STRESS_FANOTIFY,
 	STRESS_FORK,
 	STRESS_FP_ERROR,
 	STRESS_FSTAT,
 	STRESS_FULL,
+	STRESS_FUNCCALL,
 	STRESS_FUTEX,
 	STRESS_GET,
 	STRESS_GETRANDOM,
@@ -1279,6 +1311,7 @@ typedef enum {
 	STRESS_QSORT,
 	STRESS_QUOTA,
 	STRESS_RADIXSORT,
+	STRESS_RAWDEV,
 	STRESS_RDRAND,
 	STRESS_READAHEAD,
 	STRESS_REMAP_FILE_PAGES,
@@ -1327,6 +1360,7 @@ typedef enum {
 	STRESS_TIMERFD,
 	STRESS_TLB_SHOOTDOWN,
 	STRESS_TMPFS,
+	STRESS_TREE,
 	STRESS_TSC,
 	STRESS_TSEARCH,
 	STRESS_UDP,
@@ -1540,6 +1574,9 @@ typedef enum {
 	OPT_FALLOCATE_OPS,
 	OPT_FALLOCATE_BYTES,
 
+	OPT_FANOTIFY,
+	OPT_FANOTIFY_OPS,
+
 	OPT_FAULT,
 	OPT_FAULT_OPS,
 
@@ -1561,9 +1598,6 @@ typedef enum {
 	OPT_FLOCK,
 	OPT_FLOCK_OPS,
 
-	OPT_FANOTIFY,
-	OPT_FANOTIFY_OPS,
-
 	OPT_FORK_OPS,
 	OPT_FORK_MAX,
 
@@ -1576,6 +1610,10 @@ typedef enum {
 
 	OPT_FULL,
 	OPT_FULL_OPS,
+
+	OPT_FUNCCALL,
+	OPT_FUNCCALL_OPS,
+	OPT_FUNCCALL_METHOD,
 
 	OPT_FUTEX,
 	OPT_FUTEX_OPS,
@@ -1844,6 +1882,10 @@ typedef enum {
 	OPT_RADIXSORT_OPS,
 	OPT_RADIXSORT_SIZE,
 
+	OPT_RAWDEV,
+	OPT_RAWDEV_METHOD,
+	OPT_RAWDEV_OPS,
+
 	OPT_RDRAND,
 	OPT_RDRAND_OPS,
 
@@ -2034,6 +2076,11 @@ typedef enum {
 	OPT_TMPFS,
 	OPT_TMPFS_OPS,
 
+	OPT_TREE,
+	OPT_TREE_OPS,
+	OPT_TREE_METHOD,
+	OPT_TREE_SIZE,
+
 	OPT_TSC,
 	OPT_TSC_OPS,
 
@@ -2190,7 +2237,7 @@ extern volatile bool g_keep_stressing_flag; /* false to exit stressor */
 extern volatile bool g_caught_sigint;	/* true if stopped by SIGINT */
 extern pid_t g_pgrp;			/* proceess group leader */
 extern jmp_buf g_error_env;		/* parsing error env */
-
+extern put_val_t g_put_val;		/* sync data to somewhere */
 
 /*
  *  stressor option value handling
@@ -2206,8 +2253,32 @@ extern void free_settings(void);
  */
 extern uint64_t uint64_zero(void);
 
-static volatile uint64_t uint64_val;
-static volatile double   double_val;
+/*
+ *  uint8_put()
+ *	stash a uint8_t value
+ */
+static inline void ALWAYS_INLINE uint8_put(const uint8_t a)
+{
+	g_put_val.uint8_val = a;
+}
+
+/*
+ *  uint16_put()
+ *	stash a uint16_t value
+ */
+static inline void ALWAYS_INLINE uint16_put(const uint16_t a)
+{
+	g_put_val.uint16_val = a;
+}
+
+/*
+ *  uint32_put()
+ *	stash a uint32_t value
+ */
+static inline void ALWAYS_INLINE uint32_put(const uint32_t a)
+{
+	g_put_val.uint32_val = a;
+}
 
 /*
  *  uint64_put()
@@ -2215,7 +2286,27 @@ static volatile double   double_val;
  */
 static inline void ALWAYS_INLINE uint64_put(const uint64_t a)
 {
-	uint64_val = a;
+	g_put_val.uint64_val = a;
+}
+
+#if defined(STRESS_INT128)
+/*
+ *  uint128_put()
+ *	stash a uint128_t value
+ */
+static inline void ALWAYS_INLINE uint128_put(const __uint128_t a)
+{
+	g_put_val.uint128_val = a;
+}
+#endif
+
+/*
+ *  float_put()
+ *	stash a float value
+ */
+static inline void ALWAYS_INLINE float_put(const float a)
+{
+	g_put_val.float_val = a;
 }
 
 /*
@@ -2224,8 +2315,18 @@ static inline void ALWAYS_INLINE uint64_put(const uint64_t a)
  */
 static inline void ALWAYS_INLINE double_put(const double a)
 {
-	double_val = a;
+	g_put_val.double_val = a;
 }
+
+/*
+ *  long_double_put()
+ *	stash a double value
+ */
+static inline void ALWAYS_INLINE long_double_put(const double a)
+{
+	g_put_val.long_double_val = a;
+}
+
 
 /* Filenames and directories */
 extern int stress_temp_filename(char *path, const size_t len,
@@ -2488,6 +2589,7 @@ extern int stress_icmp_flood_supported(void);
 extern int stress_ioport_supported(void);
 extern int stress_netlink_proc_supported(void);
 extern int stress_physpage_supported(void);
+extern int stress_rawdev_supported(void);
 extern int stress_rdrand_supported(void);
 extern int stress_sgx_supported(void);
 extern int stress_softlockup_supported(void);
@@ -2525,6 +2627,7 @@ extern int  stress_set_epoll_domain(const char *opt);
 extern void stress_set_exec_max(const char *opt);
 extern void stress_set_fallocate_bytes(const char *opt);
 extern void stress_set_fifo_readers(const char *opt);
+extern int  stress_set_funccall_method(const char *name);
 extern int  stress_filename_opts(const char *opt);
 extern void stress_set_fiemap_bytes(const char *opt);
 extern void stress_set_fork_max(const char *opt);
@@ -2562,6 +2665,7 @@ extern void stress_set_pthread_max(const char *opt);
 extern void stress_set_pty_max(const char *opt);
 extern void stress_set_qsort_size(const char *opt);
 extern void stress_set_radixsort_size(const char *opt);
+extern int  stress_set_rawdev_method(const char *name);
 extern void stress_set_readahead_bytes(const char *opt);
 extern int  stress_set_sctp_domain(const char *opt);
 extern void stress_set_sctp_port(const char *opt);
@@ -2586,6 +2690,8 @@ extern int  stress_set_stream_madvise(const char *opt);
 extern void stress_set_sync_file_bytes(const char *opt);
 extern void stress_set_timer_freq(const char *opt);
 extern void stress_set_timerfd_freq(const char *opt);
+extern int  stress_set_tree_method(const char *name);
+extern void stress_set_tree_size(const void *opt);
 extern void stress_set_tsearch_size(const char *opt);
 extern int  stress_set_udp_domain(const char *name);
 extern void stress_set_udp_port(const char *opt);
@@ -2630,7 +2736,7 @@ struct shim_linux_dirent64 {
 #else
 	int64_t		d_ino;		/* 64-bit inode number */
 #endif
-	shim_off64_t		d_off;		/* 64-bit offset to next structure */
+	shim_off64_t	d_off;		/* 64-bit offset to next structure */
 	unsigned short	d_reclen;	/* Size of this dirent */
 	unsigned char	d_type;		/* File type */
 	char		d_name[];	/* Filename (null-terminated) */
@@ -2800,6 +2906,7 @@ STRESS(stress_fanotify);
 STRESS(stress_fork);
 STRESS(stress_fp_error);
 STRESS(stress_fstat);
+STRESS(stress_funccall);
 STRESS(stress_full);
 STRESS(stress_futex);
 STRESS(stress_get);
@@ -2871,6 +2978,7 @@ STRESS(stress_pty);
 STRESS(stress_qsort);
 STRESS(stress_quota);
 STRESS(stress_radixsort);
+STRESS(stress_rawdev);
 STRESS(stress_rdrand);
 STRESS(stress_readahead);
 STRESS(stress_remap);
@@ -2919,6 +3027,7 @@ STRESS(stress_timer);
 STRESS(stress_timerfd);
 STRESS(stress_tlb_shootdown);
 STRESS(stress_tmpfs);
+STRESS(stress_tree);
 STRESS(stress_tsc);
 STRESS(stress_tsearch);
 STRESS(stress_udp);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -51,7 +51,7 @@ int mincore_touch_pages(void *buf, const size_t buf_len)
 	const size_t page_size = stress_get_pagesize();
 	const size_t n_pages = buf_len / page_size;
 
-#if defined(__gnu_hurd__) || defined(__minix__)
+#if !defined(HAVE_MINCORE)
 	/* systems that don't have mincore */
 	mincore_touch_pages_slow(buf, n_pages, page_size);
 	return 0;

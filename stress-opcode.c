@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,7 +26,7 @@
 
 #if defined(__linux__)
 
-#if defined(HAVE_SECCOMP_H)
+#if defined(HAVE_SECCOMP_H) && defined(HAVE_MPROTECT)
 #include <sys/prctl.h>
 #include <linux/audit.h>
 #include <linux/filter.h>

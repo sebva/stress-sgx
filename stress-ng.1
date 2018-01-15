@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH STRESS-NG 1 "November 26, 2017"
+.TH STRESS-NG 1 "January 12, 2018"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -1306,6 +1306,22 @@ device (which should always succeed).  (Linux only).
 .B \-\-full\-ops N
 stop the stress full workers after N bogo I/O operations.
 .TP
+.B \-\-funccall N
+start N workers that call functions of 1 through to 9 arguments. By default
+functions with uint64_t arguments are called, however, this can be changed
+using the \-\-funccall\-method option.
+.TP
+.B \-\-funcall\-ops N
+stop the funccall workers after N bogo function call operations. Each bogo
+operation is 1000 calls of functions of 1 through to 9 arguments of the chosen
+argument type.
+.TP
+.B \-\-funccall\-method method
+specify the method of funccall argument type to be used with 'method'. The
+default is uint64_t but can be one of uint8 uint16 uint32 uint64 uint128
+float double longdouble.  Note that uint128 is only available if the compiler
+supports the __uint128_t type.
+.TP
 .B \-\-futex N
 start N workers that rapidly exercise the futex system call. Each worker has
 two processes, a futex waiter and a futex waker. The waiter waits with a very
@@ -1349,7 +1365,7 @@ stop after N handle bogo operations.
 .B \-d N, \-\-hdd N
 start N workers continually writing, reading and removing temporary files. The
 default mode is to stress test sequential writes and reads.  With
-the \-\-\aggressive option enabled without any \-\-hdd\-opts options the
+the \-\-aggressive option enabled without any \-\-hdd\-opts options the
 hdd stressor will work through all the \-\-hdd\-opt options one by one to
 cover a range of I/O options.
 .TP
@@ -2268,6 +2284,48 @@ stop radixsort stress workers after N bogo radixsorts.
 .B \-\-radixsort\-size N
 specify number of strings to sort, default is 262144 (256 \(mu 1024).
 .TP
+.B \-\-rawdev N
+start N workers that read the underlying raw drive device using direct
+IO reads. The device (with minor number 0) that stores the current working
+directory is the raw device to be read by the stressor.  The read size is
+exactly the size of the underlying device block size.  By default, this
+stressor will exercise all the of the rawdev methods (see the
+\-\-rawdev\-method option). This is a Linux only stressor and requires
+root privilege to be able to read the raw device.
+.TP
+.B \-\-rawdev\-ops N
+stop the rawdev stress workers after N raw device read bogo operations.
+.TP
+.B \-\-rawdev\-method M
+Available rawdev stress methods are described as follows:
+.TS
+expand;
+lBw(10n)2 lBw(\n[SZ]n)
+l l.
+Method	Description
+all	T{
+iterate over all the rawdev stress methods as listed below:
+T}
+sweep	T{
+repeatedy read across the raw device from the 0th block to the end block in steps
+of the number of blocks on the device / 128 and back to the start again.
+T}
+wiggle	T{
+repeatedy read across the raw device in 128 evenly steps with each step reading
+1024 blocks backwards from each step.
+T}
+ends	T{
+repeatedy read the first and last 128 start and end blocks of the raw device
+alternating from start of the device to the end of the device.
+T}
+random	T{
+repeatedy read 256 random blocks
+T}
+burst	T{
+repeatedly read 256 sequential blocks starting from a random block on the raw device.
+T}
+.TE
+.TP
 .B \-\-rdrand N
 start N workers that read the Intel hardware random number generator (Intel
 Ivybridge processors upwards).
@@ -2823,6 +2881,25 @@ file system and perform various file based mmap operations upon it.
 .TP
 .B \-\-tmpfs\-ops N
 stop tmpfs stressors after N bogo mmap operations.
+.TP
+.B \-\-tree N
+start N workers that exercise tree data structures. The default is
+to add, find and remove 250,000 64 bit integers into AVL (avl),
+Red-Black (rb), Splay (splay) and binary trees.  The intention of
+this stressor is to exercise memory and cache with the various tree
+operations.
+.TP
+.B \-\-tree\-ops N
+stop tree stressors after N bogo ops. A bogo op covers the addtion,
+finding and removing all the items into the tree(s).
+.TP
+.B \-\-tree\-size N
+specify the size of the tree, where N is the number of 64 bit integers
+to be added into the tree.
+.TP
+.B \-\-tree\-method [ all | binary | rb | splay ]
+specify the tree to be used. By default, both the rb ad splay trees
+are used (the 'all' option). 
 .TP
 .B \-\-tsc N
 start N workers that read the Time Stamp Counter (TSC) 256 times per loop
@@ -3422,7 +3499,8 @@ is a clean room re-implementation and extension of the original
 stress tool by Amos Waterland <apw@rossby.metr.ou.edu>. Thanks also for
 contributions from Abdul Haleem, Christian Ehrhardt, James Hunt,
 Jim Rowan, Joseph DeVincentis, Luca Pizzamiglio, Luis Henriques,
-Manoj Iyer, Matthew Tippett, Rob Colclaser, Tim Gardner and Zhiyi Sun.
+Manoj Iyer, Matthew Tippett, Rob Colclaser, Tim Gardner, Tim Orling
+and Zhiyi Sun.
 .SH NOTES
 Sending a SIGALRM, SIGINT or SIGHUP to stress-ng causes it to
 terminate all the stressor processes and ensures temporary files and
@@ -3440,7 +3518,7 @@ The bogo operations metrics may change with each release  because of bug
 fixes to the code, new features, compiler optimisations or changes in system
 call performance.
 .SH COPYRIGHT
-Copyright \(co 2013-2017 Canonical Ltd.
+Copyright \(co 2013-2018 Canonical Ltd.
 .br
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

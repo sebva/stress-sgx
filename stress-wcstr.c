@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 Christian Ehrhardt
- * Copyright (C) 2015-2017 Canonical, Ltd.
+ * Copyright (C) 2015-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,23 +24,6 @@
  *
  */
 #include "stress-ng.h"
-
-#include <wchar.h>
-#if defined(HAVE_LIB_BSD)
-#define HAVE_WCSLCAT
-#define HAVE_WCSLCPY
-#define HAVE_WCSNCASECMP
-#elif defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
-#define HAVE_WCSLCAT
-#define HAVE_WCSLCPY
-#define HAVE_WCSNCASECMP
-#endif
-
-/* Ugh, a Sun gcc exception to the rule */
-#if defined(__sun__)
-#undef HAVE_WCSNCASECMP
-#undef HAVE_WCSCASECMP
-#endif
 
 #define STR1LEN 256
 #define STR2LEN 128
@@ -561,7 +544,7 @@ static void stress_wcs_all(
 static const stress_wcs_method_info_t wcs_methods[] = {
 	{ "all",		stress_wcs_all,		NULL },	/* Special "all" test */
 
-#if defined(WCSCASECMP)
+#if defined(HAVE_WCSCASECMP)
 	{ "wcscasecmp",		stress_wcscasecmp,	wcscasecmp },
 #endif
 #if defined(HAVE_WCSLCAT)

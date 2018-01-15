@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -66,7 +66,7 @@ static void check_return(const args_t *args, const int ret, const char *cmd)
  */
 static int do_fcntl(const args_t *args, const int fd)
 {
-#if defined(F_DUPFD) && !defined(__minix__)
+#if defined(F_DUPFD)
 	{
 		int ret;
 
@@ -77,11 +77,11 @@ static int do_fcntl(const args_t *args, const int fd)
 	}
 #endif
 
-#if defined(F_DUPFD_CLOEXEC) && !defined(__minix__)
+#if defined(F_DUPFD_CLOEXEC)
 	{
 		int ret;
 
-		ret = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+		ret = fcntl(fd, F_DUPFD, F_DUPFD_CLOEXEC);
 		check_return(args, ret, "F_DUPFD_CLOEXEC");
 		if (ret > -1)
 			(void)close(ret);
@@ -168,12 +168,12 @@ static int do_fcntl(const args_t *args, const int fd)
 		check_return(args, ret, "F_SETOWN_EX, F_OWNER_PID");
 #endif
 
-#if defined(F_OWNER_PGRP)
+#if defined(HAVE_GETPGRP) && defined(F_OWNER_PGRP)
 		owner.type = F_OWNER_PGRP;
 		owner.pid = getpgrp();
 		ret = fcntl(fd, F_SETOWN_EX, &owner);
 		check_return(args, ret, "F_SETOWN_EX, F_OWNER_PGRP");
-#else if defined(F_OWNER_GID)
+#elif defined(HAVE_GETPGRP) && defined(F_OWNER_GID)
 		owner.type = F_OWNER_GID;
 		owner.pid = getpgrp();
 		ret = fcntl(fd, F_SETOWN_EX, &owner);
@@ -202,7 +202,7 @@ static int do_fcntl(const args_t *args, const int fd)
 		owner.type = F_OWNER_PGRP;
 		ret = fcntl(fd, F_GETOWN_EX, &owner);
 		check_return(args, ret, "F_GETOWN_EX, F_OWNER_PGRP");
-#ele if defined(F_OWNER_GID)
+#elif defined(F_OWNER_GID)
 		owner.type = F_OWNER_GID;
 		ret = fcntl(fd, F_GETOWN_EX, &owner);
 		check_return(args, ret, "F_GETOWN_EX, F_OWNER_GID");
@@ -436,7 +436,7 @@ ofd_lock_abort:	{ /* Nowt */ }
 #endif
 		};
 
-		ret = fcntl(fd, F_GET_FILE_RW_HINT, &hint)
+		ret = fcntl(fd, F_GET_FILE_RW_HINT, &hint);
 		if (ret == 0) {
 			for (i = 0; i < SIZEOF_ARRAY(hints); i++) {
 				hint = hints[i];

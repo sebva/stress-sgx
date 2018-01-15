@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -254,7 +254,7 @@ int stress_filename (const args_t *args)
 	sz_max = (size_t)buf.f_namemax;
 
 	/* Some BSD systems return zero for sz_max */
-	if (sz_max <= 0)
+	if (sz_max == 0)
 		sz_max = 128;
 	if (sz_max > PATH_MAX)
 		sz_max = PATH_MAX;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,17 +26,13 @@
 
 #if (defined(STRESS_X86) || defined(STRESS_ARM) || \
      defined(STRESS_S390) || defined(STRESS_PPC64)) && \
-     defined(__GNUC__) && NEED_GNUC(4,6,0)
+     defined(__GNUC__) && NEED_GNUC(4,6,0) && \
+     defined(HAVE_MPROTECT)
 
 #define SIZE_1K		(1024)
 #define SIZE_4K		(4 * SIZE_1K)
 #define SIZE_16K	(16 * SIZE_1K)
 #define SIZE_64K	(64 * SIZE_1K)
-
-#if defined(__GNUC__) && NEED_GNUC(4,6,0)
-#define SECTION(s) __attribute__((__section__(# s)))
-#define ALIGNED(a) __attribute__((aligned(a)))
-#endif
 
 /*
  *  STRESS_ICACHE_FUNC()

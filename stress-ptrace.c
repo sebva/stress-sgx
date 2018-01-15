@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -97,8 +97,10 @@ int stress_ptrace(const args_t *args)
 			pidtmp = getppid();
 			(void)pidtmp;
 
+#if defined(HAVE_GETPGRP)
 			pidtmp = getpgrp();
 			(void)pidtmp;
+#endif
 
 			gidtmp = getgid();
 			(void)gidtmp;

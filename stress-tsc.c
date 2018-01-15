@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@
  */
 #include "stress-ng.h"
 
-#if defined(STRESS_X86) && !defined(__OpenBSD__) && NEED_GNUC(4,6,0)
+#if defined(STRESS_X86) && defined(HAVE_CPUID) && NEED_GNUC(4,6,0)
 
 static bool tsc_supported = false;
 

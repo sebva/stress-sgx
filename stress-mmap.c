@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -75,7 +75,7 @@ void stress_set_mmap_bytes(const char *opt)
  */
 static void stress_mmap_mprotect(const char *name, void *addr, const size_t len)
 {
-#if !defined(__minix__)
+#if defined(HAVE_MPROTECT)
 	if (g_opt_flags & OPT_FLAGS_MMAP_MPROTECT) {
 		/* Cycle through potection */
 		if (mprotect(addr, len, PROT_NONE) < 0)
@@ -210,9 +210,7 @@ static void stress_mmap_child(
 								"not contain expected data\n", args->name, page_size);
 						if (g_opt_flags & OPT_FLAGS_MMAP_FILE) {
 							(void)memset(mappings[page], n, page_size);
-#if !defined(__gnu_hurd__) && !defined(__minix__)
-							(void)msync((void *)mappings[page], page_size, ms_flags);
-#endif
+							(void)shim_msync((void *)mappings[page], page_size, ms_flags);
 						}
 					}
 					n--;

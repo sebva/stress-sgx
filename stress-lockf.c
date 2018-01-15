@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,8 +24,7 @@
  */
 #include "stress-ng.h"
 
-#if _BSD_SOURCE || _SVID_SOURCE || _XOPEN_SOURCE >= 500 || \
-     (_XOPEN_SOURCE && _XOPEN_SOURCE_EXTENDED)
+#if defined(HAVE_LOCKF)
 
 #define LOCK_FILE_SIZE	(64 * 1024)
 #define LOCK_SIZE	(8)

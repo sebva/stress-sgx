@@ -1,3 +1,154 @@
+stress-ng (0.09.10-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * stress-tlb-shootdown: ensure proc_mask is zero'd before use
+  * Makefile.config: make fdatasync test fail if prototype is different
+  * stress-rawdev: fix warning on non-linux builds
+  * Manual: add another contributor to the manual
+  * stress-unshare: throttle back when resources are getting low
+  * stress-rawdev: make min/max block size #define values
+  * stress-rawdev: ensure blksize cannot be less than 512 bytes
+  * stress-rawdev: don't allow insanely sized block sizes
+  * stress-rawdev: add a keep stressing check inside wiggle 2nd loop
+  * stress-rawdev: ensure shifted values are never zero
+  * stress-rawdev: use correct type for reading block size
+  * stress-resources: ensure we don't have too many resource forks
+  * stress-resources: try hard not to get too many OOMs
+  * stress-dev: disable /dev/hpet testing when running as root
+  * debian/control: skip requirement of libkeyutils-dev for ia64
+  * stress-matrix: fix broken xy vs yx matrix method selection
+  * stress-vm: remove a duplicated check addr == ptr
+  * stress-filename: compare to zero rather than <= 0
+  * stress-fcntl.c: fix syntax errors
+  * Update copyright year
+
+ -- Colin King <colin.king@canonical.com>  Fri, 12 Jan 2018 13:47:57 +0000
+
+stress-ng (0.09.09-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * stress-tlb-shootdown: only kill legitimate pids
+  * stress-tlb-shootdown: make child processes more OOM-able
+  * stress-rawdev: replace some spaces with tab for indentation
+  * stress-ng.1: fix table for rawdev-method option
+
+ -- Colin King <colin.king@canonical.com>  Thu, 4 Jan 2018 01:37:11 +0000
+
+stress-ng (0.09.08-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Makefile.config: remove need for LIBBSD for wchar.h path detection
+  * stress-rawdev: fix linking failure on non linux systems
+  * Add wchar.h and bsd/wchar.h path detection, makes stress-ng.h cleaner
+  * Add rawdev raw device read stressor
+  * stress-vecmath: use uint128_put for 128 bit integer
+  * Move ALIGNED and SECTION macros to stress-ng.h
+  * Add OPTIMIZE0 level zero optimization hint macro
+  * stress-socket-diag: remove some consts, cleans up clang warnings
+  * Use the FORMAT macro for some printf style functions
+  * stress-vm: fix warning when building with PEDANTIC=1
+  * stress-tlb-shootdown: fix unterminated comment
+  * stress-timer: fix warning when building with PEDANTIC=1
+  * stress-itimer: fix warning when building with PEDANTIC=1
+  * stress-funccall: clean up warnings when building with PEDANTIC=1
+  * stress-physpage: only close an opened fd_pc file descriptor
+  * stress-tlb: fix incorrect affinity on cores
+
+ -- Colin King <colin.king@canonical.com>  Sun, 31 Dec 2017 17:18:23 +0000
+
+stress-ng (0.09.07-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Makefile: add stress-version.h to make dist rules
+  * test: clean up errors in config tests found by static analysis
+  * Add lockf autoconfigure detection
+  * stress-io: use HAVE_SYNCFS to detect syncfs availability
+  * stress-dirdeep: use HAVE_SYNCFS to detect syncfs availability
+  * Add syncfs autoconfigure detection
+  * Add fdatasync autoconfigure detection
+  * Add fsync autoconfigure detection
+  * stress-flock: remove __sun__ restriction
+  * Add posix_memalign autoconfigure detection
+  * Add futimes autoconfigure detection
+  * stress-zlib: remove restriction on __sun__
+  * stress-wait: only disable for broken GNU/Hurd
+  * Makefile.config: add -Werror to fix build warnings on Minix
+  * Add mount autoconfigure detection for BSD and Linux
+  * stress-rmap: remove build restrictions on non-linux systems
+  * stress-ng: ensure utsname.h is included for non-linux builds
+  * stress-get: ensure utsname.h is included for non-linux builds
+  * stress-get: fix build error on non-linux platform
+  * Add x86 cpuid autoconfigure detection
+  * Add strlcpy strlcat string func autoconfigure detection
+  * helper: clean up utsname includes
+  * Add uname autoconfiguration detection
+  * stress-msync: replace __minix__ with HAVE_MSYNC
+  * stress-mincore: use the HAVE_MINCORE macro rather than __gnu_hurd__
+  * Add sigwaitinfo and sigqueue autoconfig detection
+  * stress-hdd: replace __gnu_hurd__ with more generic posix fadvise check
+  * stress-wait: add notes on why this is disabled on GNU/Hurd
+  * helper: use HAVE_SIGALTSTACK instead of minix and GNU/Hurd checks
+  * stress-msync: enable build for GNU/Hurd
+  * Add posix_openpt autoconfig detection
+  * stress-mincore: remove extraneous space at end of error message
+  * test/test-posix-fadvise: force failures GNU/Hurd
+  * Add posix_fadvise autoconfig detection
+  * test: force failures for mincore and msync for GNU/Hurd
+  * stress-fcntl: fix incorrect usage of F_DUPFD_CLOEXEC flag
+  * stress-get: remove __minix__ #define check
+  * Add mincore autoconfig detection
+  * Add msync autoconfigure detection
+  * stress-mmap: call shim_msync rather than msync
+  * Add mprotect autoconfigure detection
+  * Add autoconfigure detection of sigaltstack
+  * Add autodetection of mlockall and munlockall
+  * Add mlock autodetection
+  * Add getpgid autoconfigure detection
+  * Add getpgrp autoconfigure detection
+  * split out version macros into stress-version.h
+  * Add dup3 autoconfigure detection
+  * stress-trees: voidify return of get_setting for tree-method option
+
+ -- Colin King <colin.king@canonical.com>  Thu, 14 Dec 2017 18:12:01 +0000
+
+stress-ng (0.09.06-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Add more smarts in autodetecting wcs* functions
+  * stress-tree fixes that got discovered after the 0.09.05 release:
+    - stress-tree: minor changes to splay and rb tree setup and insertion
+    - stress-tree: fix up tree method calling and add AVL tree
+  * stress-tree: add binary tree
+  * stress-tree: use faster method to populate data
+
+ -- Colin King <colin.king@canonical.com>  Fri, 8 Dec 2017 16:24:56 +0000
+
+stress-ng (0.09.05-1) unstable; urgency=medium
+
+  * Makefile: bump version
+  * Makefile: remove .xz tarball instead of .gz on make clean rule
+  * debian/control: update Standards-Version to 4.1.2
+  * Debian: watch: change watch URL to use .xz rather than .gz
+  * Makefile: use xz compression on tarball make dist rule
+  * Manual: Add more information in the tree description
+  * stress-wcstr: fix build issues for GNU/kFreeBSD builds
+  * Don't include bsd/wchar.h for GNU/kFreeBSD
+  * libbsd test: Add *BSD support
+  * stress-treee: don't build for __APPLE__
+  * Add DragonFly BSD to BSD support for libbsd
+  * stress-tree: fix build for systems without libbsd
+  * stress-ng: add funccall mini help options.
+  * Add libbsd tree stressor
+  * test/test-libpthread: remove POSIX semaphore checks
+  * stress-ng.h: fix indentation
+  * Move put values into global union, saves > 40K on x86
+  * Add the funccall function call stressor
+  * Makefile: move fanotify stressor to correct alphabetical order place
+  * stress-dev: perform open with O_RDONLY | O_WRONLY for ioctl opens
+  * stress-clone: catch OOM'ing clone stressors and re-spawn them
+
+ -- Colin King <colin.king@canonical.com>  Wed, 6 Dec 2017 13:20:46 +0000
+
 stress-ng (0.09.04-1) unstable; urgency=medium
 
   * Makefile: bump version

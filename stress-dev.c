@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -50,7 +50,7 @@ static inline void stress_dev_rw(
 	struct timeval tv;
 
 	if ((fd = open(path, O_RDONLY | O_NONBLOCK)) < 0)
-		return;
+		goto rdwr;
 
 	if (fstat(fd, &buf) < 0) {
 		pr_fail_err("stat");
@@ -97,15 +97,26 @@ static inline void stress_dev_rw(
 	(void)close(fd);
 
 	if ((fd = open(path, O_RDONLY | O_NONBLOCK)) < 0)
-		return;
+		goto sync;
 	ptr = mmap(NULL, args->page_size, PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if (ptr != MAP_FAILED)
 		munmap(ptr, args->page_size);
 
+sync:
 	ret = fsync(fd);
 	(void)ret;
 
 	(void)close(fd);
+
+rdwr:
+	/*
+	 *   O_RDONLY | O_WRONLY allows one to
+	 *   use the fd for ioctl() only operations
+	 */
+	fd = open(path, O_RDONLY | O_WRONLY | O_NONBLOCK);
+	if (fd >= 0) {
+		(void)close(fd);
+	}
 }
 
 /*
@@ -184,7 +195,8 @@ static void stress_dev_dir(
 	const args_t *args,
 	const char *path,
 	const bool recurse,
-	const int depth)
+	const int depth,
+	const uid_t euid)
 {
 	DIR *dp;
 	struct dirent *d;
@@ -208,6 +220,10 @@ static void stress_dev_dir(
 		if (!strcmp(d->d_name, ".") ||
 		    !strcmp(d->d_name, ".."))
 			continue;
+		/* Xen clients hang on hpet when running as root */
+		if (!euid && !strcmp(d->d_name, "hpet"))
+			continue;
+
 		switch (d->d_type) {
 		case DT_DIR:
 			if (recurse) {
@@ -215,7 +231,7 @@ static void stress_dev_dir(
 				(void)snprintf(filename, sizeof(filename),
 					"%s/%s", path, d->d_name);
 				stress_dev_dir(args, filename, recurse,
-					depth + 1);
+					depth + 1, euid);
 			}
 			break;
 		case DT_BLK:
@@ -238,6 +254,8 @@ static void stress_dev_dir(
  */
 int stress_dev(const args_t *args)
 {
+	uid_t euid = geteuid();
+
 	do {
 		pid_t pid;
 
@@ -268,7 +286,7 @@ again:
 
 			/* Make sure this is killable by OOM killer */
 			set_oom_adjustment(args->name, true);
-			stress_dev_dir(args, "/dev", true, 0);
+			stress_dev_dir(args, "/dev", true, 0, euid);
 		}
 	} while (keep_stressing());
 

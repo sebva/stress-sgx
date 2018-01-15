@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -144,6 +144,8 @@ int pr_msg(
  *  __pr_msg_fail()
  *	wrapper helper for pr_msg_fail
  */
+static inline void __pr_msg_fail(const uint64_t flag, char *fmt, ...) FORMAT(printf, 2, 0);
+
 static inline void __pr_msg_fail(const uint64_t flag, char *fmt, ...)
 {
 	va_list ap;

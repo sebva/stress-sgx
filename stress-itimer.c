@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -73,7 +73,7 @@ static void stress_itimer_set(struct itimerval *timer)
  *  stress_itimer_keep_stressing()
  *      returns true if we can keep on running a stressor
  */
-bool HOT OPTIMIZE3 stress_itimer_keep_stressing(void)
+static bool HOT OPTIMIZE3 stress_itimer_keep_stressing(void)
 {
         return (LIKELY(g_keep_stressing_flag) &&
                 LIKELY(!max_ops || (itimer_counter < max_ops)));

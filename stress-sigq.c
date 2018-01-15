@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,9 @@
  */
 #include "stress-ng.h"
 
-#if _POSIX_C_SOURCE >= 199309L && !defined(__gnu_hurd__)
+#if _POSIX_C_SOURCE >= 199309L && \
+    defined(HAVE_SIGQUEUE) && \
+    defined(HAVE_SIGWAITINFO)
 
 static void MLOCKED stress_sigqhandler(int dummy)
 {

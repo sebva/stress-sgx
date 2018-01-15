@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -28,10 +28,6 @@
 /* The following functions from libpthread are used by stress-ng */
 
 static void *pthread_funcs[] = {
-	(void *)sem_init,
-	(void *)sem_destroy,
-	(void *)sem_post,
-	(void *)sem_timedwait,
 	(void *)pthread_create,
 	(void *)pthread_join,
 	(void *)pthread_mutex_lock,

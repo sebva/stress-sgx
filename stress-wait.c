@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,14 @@
  */
 #include "stress-ng.h"
 
-#if !defined(__gnu_hurd__) && !defined(__NetBSD__)
+
+/*
+ *  Disabled for GNU/Hurd because it this stressor breaks with
+ *  the error:
+ *    intr-msg.c:387: _hurd_intr_rpc_mach_msg: Assertion 
+ *    `m->header.msgh_id == msgid + 100' 
+ */
+#if !defined(__gnu_hurd__)
 
 #define ABORT_TIMEOUT	(1.0)
 

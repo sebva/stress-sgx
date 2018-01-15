@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@
  */
 #include "stress-ng.h"
 
-#if defined(__linux__)
+#if defined(__linux__) && defined(HAVE_MPROTECT)
 
 #define MAX_TLB_PROCS	(8)
 #define MIN_TLB_PROCS	(2)
@@ -39,6 +39,12 @@ int stress_tlb_shootdown(const args_t *args)
 	const size_t page_size = args->page_size;
 	const size_t mmap_size = page_size * MMAP_PAGES;
 	pid_t pids[MAX_TLB_PROCS];
+	cpu_set_t proc_mask_initial;
+
+	if (sched_getaffinity(0, sizeof(proc_mask_initial), &proc_mask_initial) < 0) {
+		pr_fail_err("could not get CPU affinity");
+		return EXIT_FAILURE;
+	}
 
 	do {
 		uint8_t *mem, *ptr;
@@ -47,10 +53,8 @@ int stress_tlb_shootdown(const args_t *args)
 		int32_t tlb_procs, i;
 		const int32_t max_cpus = stress_get_processors_configured();
 
-		if (sched_getaffinity(0, sizeof(proc_mask), &proc_mask) < 0) {
-			pr_fail_err("could not get CPU affinity");
-			return EXIT_FAILURE;
-		}
+		CPU_ZERO(&proc_mask);
+		CPU_OR(&proc_mask, &proc_mask_initial, &proc_mask);
 
 		tlb_procs = max_cpus;
 		if (tlb_procs > MAX_TLB_PROCS)
@@ -97,6 +101,12 @@ int stress_tlb_shootdown(const args_t *args)
 				cpu_set_t mask;
 				char buffer[page_size];
 
+				(void)setpgid(0, g_pgrp);
+				stress_parent_died_alarm();
+
+				/* Make sure this is killable by OOM killer */
+				set_oom_adjustment(args->name, true);
+
 				CPU_ZERO(&mask);
 				CPU_SET(cpu % max_cpus, &mask);
 				(void)sched_setaffinity(args->pid, sizeof(mask), &mask);
@@ -113,13 +123,31 @@ int stress_tlb_shootdown(const args_t *args)
 
 		for (i = 0; i < tlb_procs; i++) {
 			if (pids[i] != -1) {
-				int status;
+				int status, ret;
 
-				(void)kill(pids[i], SIGKILL);
-				(void)waitpid(pids[i], &status, 0);
+				ret = waitpid(pids[i], &status, 0);
+				if ((ret < 0) && (errno == EINTR)) {
+					int j;
+
+					/*
+					 * We got interrupted, so assume
+					 * it was the alarm (timedout) or
+					 * SIGINT so force terminate
+					 */
+					for (j = i; j < tlb_procs; j++) {
+						if (pids[j] != -1)
+							(void)kill(pids[j], SIGKILL);
+					}
+
+					/* re-wait on the failed wait */
+					(void)waitpid(pids[i], &status, 0);
+
+					/* and continue waitpid on the pids */
+				}
 			}
 		}
 		(void)munmap(mem, mmap_size);
+		(void)sched_setaffinity(0, sizeof(proc_mask_initial), &proc_mask_initial);
 		inc_counter(args);
 	} while (keep_stressing());
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -31,7 +31,7 @@
  */
 int stress_mlock_region(const void *addr_start, const void *addr_end)
 {
-#if !defined(__minix__)
+#if defined(HAVE_MLOCK)
 	const size_t page_size = stress_get_pagesize();
 	void *m_addr_start =
 		(void *)((ptrdiff_t)addr_start & ~(page_size - 1));

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -112,7 +112,7 @@ int stress_readahead(const args_t *args)
 	}
 	(void)unlink(filename);
 
-#if defined(POSIX_FADV_DONTNEED)
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
 	if (posix_fadvise(fd, 0, readahead_bytes, POSIX_FADV_DONTNEED) < 0) {
 		pr_fail_err("posix_fadvise");
 		goto close_finish;

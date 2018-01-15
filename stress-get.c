@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Canonical, Ltd.
+ * Copyright (C) 2013-2018 Canonical, Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,8 +27,10 @@
 #define _DEFAULT_SOURCE 1
 #define _BSD_SOURCE 1
 
-#if defined(__linux__)
+#if defined(HAVE_UNAME)
 #include <sys/utsname.h>
+#endif
+#if defined(__linux__)
 #include <sys/timex.h>
 #endif
 
@@ -124,12 +126,12 @@ int stress_get(const args_t *args)
 #if defined(__linux__)
 		gid_t rgid, egid, sgid;
 		uid_t ruid, euid, suid;
-		struct utsname utsbuf;
 		struct timex timexbuf;
 #endif
-#if !defined(__minix__)
-		const pid_t mypid = getpid();
+#if defined(HAVE_UNAME)
+		struct utsname utsbuf;
 #endif
+		const pid_t mypid = getpid();
 		int ret, n, fs_index;
 		size_t i;
 		struct timeval delta, tv;
@@ -137,6 +139,8 @@ int stress_get(const args_t *args)
 		pid_t pid;
 		gid_t gid;
 		uid_t uid;
+
+		(void)mypid;
 
 		check_do_run();
 
@@ -170,13 +174,13 @@ int stress_get(const args_t *args)
 			pr_fail_err("getgroups");
 		check_do_run();
 
-#if !defined(__minix__)
+#if defined(HAVE_GETPGRP)
 		pid = getpgrp();
 		(void)pid;
 		check_do_run();
 #endif
 
-#if !defined(__minix__)
+#if defined(HAVE_GETPGID)
 		pid = getpgid(mypid);
 		(void)pid;
 		check_do_run();
@@ -267,7 +271,7 @@ int stress_get(const args_t *args)
 		ret = gettimeofday(&tv, NULL);
 		if (verify && (ret < 0))
 			pr_fail_err("gettimeval");
-#if defined(__linux__)
+#if defined(HAVE_UNAME)
 		ret = uname(&utsbuf);
 		if (verify && (ret < 0))
 			pr_fail_err("uname");
