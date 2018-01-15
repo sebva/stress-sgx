@@ -122,7 +122,7 @@ static void HOT stress_cpu_sqrt(const char *name)
 		    (uint64_t)rint(r) != rnd) {
 			pr_fail("%s: sqrt error detected on "
 				"sqrt(%" PRIu64 ")\n", name, rnd);
-			if (!g_keep_stressing_flag)
+			if (!(*g_keep_stressing_flag))
 				break;
 		}
 	}
@@ -721,7 +721,7 @@ static void HOT OPTIMIZE3 stress_cpu_idct(const char *name)
 						name, i, j, (int)idct[i][j]);
 				}
 			}
-			if (!g_keep_stressing_flag)
+			if (!(*g_keep_stressing_flag))
 				return;
 		}
 	}
