@@ -2,9 +2,10 @@
 
 enclave {
     untrusted {
+    		void ocall_pr_fail([in, string] const char* str); 
     };
 
     trusted {
-    	    public int ecall_stress_cpu([in, string] const char* method_name, uint64_t rounds, [user_check] _Bool* g_keep_stressing_flag);
+    	    public int ecall_stress_cpu([in, string] const char* method_name, uint64_t rounds, [user_check] _Bool* g_keep_stressing_flag, uint64_t opt_flags);
     };
 };

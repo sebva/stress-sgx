@@ -14,6 +14,11 @@ int stress_sgx_supported(void)
 	return 0;
 }
 
+void ocall_pr_fail(const char* str)
+{
+	pr_fail(str);
+}
+
 /*
  *  stress_sgx
  *	Various SGX-related stressors
@@ -38,7 +43,7 @@ int stress_sgx(const args_t *args)
 
 	printf("Will ECALL into enclave\n");
 	int ret;
-	status = ecall_stress_cpu(eid, &ret, method->name, args->max_ops, &g_keep_stressing_flag);
+	status = ecall_stress_cpu(eid, &ret, method->name, args->max_ops, &g_keep_stressing_flag, g_opt_flags);
 	if (status != SGX_SUCCESS) {
 		print_error_message(status);
 		abort();

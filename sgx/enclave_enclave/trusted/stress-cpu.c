@@ -24,6 +24,8 @@
  */
 #include "companion.h"
 
+uint64_t g_opt_flags;
+
 #define GAMMA 		(0.57721566490153286060651209008240243104215933593992L)
 #define OMEGA		(0.56714329040978387299996866221035554975381578718651L)
 #define PSI		(3.359885666243177553172011302918927179688905133732L)
@@ -158,6 +160,9 @@ static void HOT OPTIMIZE3 stress_cpu_gcd(const char *name)
 		i_sum += a;
 		FORCE_DO_NOTHING();
 	}
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (i_sum != sum))
+		pr_fail("%s: gcd error detected, failed modulo "
+			"or assignment operations\n", name);
 }
 
 /*

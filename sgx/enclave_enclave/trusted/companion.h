@@ -24,6 +24,8 @@
  */
 #include <math.h>
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -101,6 +103,9 @@ double _Complex __muldc3(double __a, double __b, double __c, double __d)
 
     return z;
 }
+
+#define OPT_FLAGS_VERIFY	 0x00000000002000ULL	/* verify mode */
+#define OPT_FLAGS_LOG_BRIEF	 0x00010000000000ULL	/* --log-brief */
 
 #define STRESS_VECTOR	1
 #define CASE_FALLTHROUGH __attribute__((fallthrough)) /* Fallthrough */
@@ -284,4 +289,16 @@ typedef struct {
 	size_t page_size;		/* page size */
 } args_t;
 
+void pr_fail(const char *fmt, ...)
+{
+	int ret = 0;
+	char buf[BUFSIZ] = {'\0'};
+	va_list ap;
 
+	va_start(ap, fmt);
+	ret = vsnprintf(buf, BUFSIZ, fmt, ap);
+	if (ret >= 0) {
+		ocall_pr_fail(buf);
+	}
+	va_end(ap);
+}
