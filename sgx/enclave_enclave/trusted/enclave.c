@@ -5,22 +5,20 @@
  *  keep_stressing()
  *	returns true if we can keep on running a stressor
  */
-bool HOT OPTIMIZE3 keep_stressing(const uint64_t rounds, uint64_t counter)
+bool HOT OPTIMIZE3 keep_stressing(const uint64_t rounds, uint64_t *const counter)
 {
 	return (LIKELY(*g_keep_stressing_flag) &&
-				LIKELY(!rounds || (counter < rounds)));
+				LIKELY(!rounds || ((*counter) < rounds)));
 }
 
-void run_stressor(const stress_cpu_method_info_t* info, const uint64_t rounds) {
-	uint64_t counter = 0;
-
+void run_stressor(const stress_cpu_method_info_t* info, const uint64_t rounds, uint64_t *const counter) {
 	do {
 		(info->func)("stress-sgx");
-		counter++;
+		(*counter)++;
 	} while(keep_stressing(rounds, counter));
 }
 
-int ecall_stress_cpu(const char* method_name, const uint64_t rounds, bool* keep_stressing_flag, uint64_t opt_flags)
+int ecall_stress_cpu(const char* method_name, const uint64_t rounds, uint64_t *const counter , bool* keep_stressing_flag, uint64_t opt_flags)
 {
 	stress_cpu_method_info_t const *info;
 
@@ -33,7 +31,7 @@ int ecall_stress_cpu(const char* method_name, const uint64_t rounds, bool* keep_
 
 	for (info = cpu_methods; info->func; info++) {
 		if (!strcmp(info->name, method_name)) {
-			run_stressor(info, rounds);
+			run_stressor(info, rounds, counter);
 			return 0;
 		}
 	}
