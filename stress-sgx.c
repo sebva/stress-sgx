@@ -27,7 +27,7 @@ int stress_sgx(const args_t *args)
 {
 	stress_cpu_method_info_t* method;
 	get_setting("cpu-method", &method);
-	printf("Method will be %s\n", method->name);
+	pr_dbg("Method will be %s\n", method->name);
 
 
 	sgx_enclave_id_t eid = 0;
@@ -41,7 +41,7 @@ int stress_sgx(const args_t *args)
 	}
 
 
-	printf("Will ECALL into enclave\n");
+	pr_dbg("Will ECALL into enclave\n");
 	int ret;
 	status = ecall_stress_cpu(eid, &ret, method->name, args->max_ops, (args->counter), &g_keep_stressing_flag, g_opt_flags);
 	if (status != SGX_SUCCESS) {
@@ -50,7 +50,7 @@ int stress_sgx(const args_t *args)
 	}
 
 	sgx_destroy_enclave(eid);
-	printf("Enclave destroyed\n");
+	pr_dbg("Enclave destroyed\n");
 
 	switch(ret) {
 	case 0:
