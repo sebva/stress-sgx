@@ -46,8 +46,9 @@ Crypto_Library_Name := sgx_tcrypto
 Enclave_C_Files := trusted/enclave.c
 Enclave_Include_Paths := -IInclude -Itrusted -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/libcxx
 
+-include ../../config
 Flags_Just_For_C := -Wno-implicit-function-declaration -std=gnu99
-Common_C_Cpp_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths) -fno-builtin-printf -I.
+Common_C_Cpp_Flags := $(SGX_COMMON_CFLAGS) $(CONFIG_CFLAGS) -nostdinc -fvisibility=hidden -fpie $(Enclave_Include_Paths) -fno-builtin-printf -I.
 Enclave_C_Flags := $(Flags_Just_For_C) $(Common_C_Cpp_Flags)
 
 Enclave_Link_Flags := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) \
@@ -97,15 +98,15 @@ trusted/enclave_t.c: $(SGX_EDGER8R) ./trusted/enclave.edl
 	@echo "GEN  =>  $@"
 
 trusted/enclave_t.o: ./trusted/enclave_t.c
-	@$(CC) $(Enclave_C_Flags) -c $< -o $@
+	$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
-trusted/%.o: trusted/%.c trusted/stress-cpu.c
-	@$(CC) $(Enclave_C_Flags) -c $< -o $@
+trusted/%.o: trusted/%.c trusted/stress-cpu.c ../../config
+	$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC  <=  $<"
 
 enclave.so: trusted/enclave_t.o $(Enclave_C_Objects)
-	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+	$(CC) $^ -o $@ $(Enclave_Link_Flags)
 	@echo "LINK =>  $@"
 
 enclave.signed.so: enclave.so
