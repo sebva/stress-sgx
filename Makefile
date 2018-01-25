@@ -302,7 +302,11 @@ endif
 CFLAGS += $(CONFIG_CFLAGS)
 CFLAGS += -I$(SGX_SDK)/include
 LDFLAGS += $(CONFIG_LDFLAGS)
-LDFLAGS += -L$(SGX_SDK)/lib64 -lsgx_urts
+ifneq ($(SGX_MODE), HW)
+	LDFLAGS += -L$(SGX_SDK)/lib64 -lsgx_urts_sim
+else
+	LDFLAGS += -L$(SGX_SDK)/lib64 -lsgx_urts
+endif
 OBJS += $(CONFIG_OBJS)
 
 .SUFFIXES: .c .o
