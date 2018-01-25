@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
+#include "stress-cpu.h"
 #include "companion.h"
 
 uint64_t g_opt_flags;
@@ -86,18 +87,6 @@ bool* g_keep_stressing_flag;
 #if !defined(HAVE_SQRTL)
 #define sqrtl	sqrt
 #endif
-
-/*
- *  the CPU stress test has different classes of cpu stressor
- */
-typedef void (*stress_cpu_func)(const char *name);
-
-typedef struct {
-	const char		*name;	/* human readable form of stressor */
-	const stress_cpu_func	func;	/* the cpu method function */
-} stress_cpu_method_info_t;
-
-static const stress_cpu_method_info_t cpu_methods[];
 
 /* Don't make this static to ensure dithering does not get optimised out */
 uint8_t pixels[STRESS_CPU_DITHER_X][STRESS_CPU_DITHER_Y];
@@ -2183,7 +2172,7 @@ static HOT OPTIMIZE3 void stress_cpu_all(const char *name)
 /*
  * Table of cpu stress methods
  */
-static const stress_cpu_method_info_t cpu_methods[] = {
+const stress_cpu_method_info_t cpu_methods[] = {
 	{ "all",		stress_cpu_all },	/* Special "all test */
 
 	{ "ackermann",		stress_cpu_ackermann },

@@ -4,6 +4,8 @@ enclave.so
         g_global_data_sim;
         g_global_data;
         enclave_entry;
+        real_stress_cpu;
+        cpu_methods;
     local:
         *;
 };

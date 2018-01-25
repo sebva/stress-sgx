@@ -82,3 +82,7 @@ int ecall_stress_cpu(const char* method_name, const uint64_t rounds,
 
 	return -1;
 }
+
+int real_stress_cpu(const char* method_name, const uint64_t rounds, uint64_t *const counter, bool* keep_stressing_flag, uint64_t opt_flags) {
+	return ecall_stress_cpu(method_name, rounds, counter, keep_stressing_flag, opt_flags);
+}

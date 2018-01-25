@@ -76,7 +76,7 @@ STRESS_SRC = \
 	stress-clone.c \
 	stress-context.c \
 	stress-copy-file.c \
-	stress-cpu.c \
+	stress-cpuso.c \
 	stress-cpu-online.c \
 	stress-crypt.c \
 	stress-cyclic.c \
@@ -303,7 +303,7 @@ endif
 
 CFLAGS += $(CONFIG_CFLAGS)
 CFLAGS += -I$(SGX_SDK)/include
-LDFLAGS += $(CONFIG_LDFLAGS)
+LDFLAGS += $(CONFIG_LDFLAGS) ./sgx/enclave_cpu/enclave_cpu.so
 ifneq ($(SGX_MODE), HW)
 	LDFLAGS += -L$(SGX_SDK)/lib64 -lsgx_urts_sim -lsgx_uae_service_sim
 else
