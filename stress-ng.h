@@ -1946,6 +1946,7 @@ typedef enum {
 
 	OPT_SGX,
 	OPT_SGX_OPS,
+	OPT_SGX_METHOD,
 
 	OPT_SHM_POSIX,
 	OPT_SHM_POSIX_OPS,
@@ -2673,6 +2674,7 @@ extern void stress_set_seek_size(const char *opt);
 extern void stress_set_semaphore_posix_procs(const char *opt);
 extern void stress_set_semaphore_sysv_procs(const char *opt);
 extern void stress_set_sendfile_size(const char *opt);
+extern int  stress_set_sgx_method(const char *name);
 extern void stress_set_shm_posix_bytes(const char *opt);
 extern void stress_set_shm_posix_objects(const char *opt);
 extern void stress_set_shm_sysv_bytes(const char *opt);

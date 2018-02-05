@@ -2154,6 +2154,24 @@ static void stress_cpu_stats(const char *name)
 			name, am, max);
 }
 
+static void stress_cpu_enclave_transitions(const char *name)
+{
+	uint64_t result;
+	int status;
+
+	status = ocall_dummy(&result, 10000UL);
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (status != SGX_SUCCESS))
+	{
+		pr_fail("%s: Error %d with OCALL\n", name, status);
+	}
+	uint64_put(result);
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) &&
+		(uint64_val != 10001UL)) {
+		pr_fail("%s: OCALL " PRIu64 " != 10000\n", name, result);
+	}
+}
+
 /*
  *  stress_cpu_all()
  *	iterate over all cpu stressors
@@ -2235,6 +2253,7 @@ static const stress_cpu_method_info_t cpu_methods[] = {
 	{ "loop",		stress_cpu_loop },
 	{ "matrixprod",		stress_cpu_matrix_prod },
 	{ "nsqrt",		stress_cpu_nsqrt },
+	{ "ocall",		stress_cpu_enclave_transitions },
 	{ "omega",		stress_cpu_omega },
 	{ "parity",		stress_cpu_parity },
 	{ "phi",		stress_cpu_phi },
