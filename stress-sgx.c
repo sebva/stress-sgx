@@ -25,15 +25,58 @@ uint64_t ocall_dummy(uint64_t param)
 }
 
 /*
+ *  stress_set_sgx_method()
+ *	set the default sgx stress method
+ */
+int stress_set_sgx_method(const char *name)
+{
+	const int bufsize = 2000;
+	int method_exists = 0;
+	sgx_enclave_id_t eid = 0;
+	sgx_status_t status;
+
+	/* Initialize the enclave */
+	status = initialize_enclave(&eid);
+	if (status != SGX_SUCCESS) {
+		printf("Error %d\n", status);
+		return -1;
+	}
+
+	status = ecall_method_exists(eid, &method_exists, name);
+	if (status != SGX_SUCCESS) {
+		pr_fail("Unable to enter enclave, check SGX driver & PSW\n");
+		return -1;
+	}
+
+	if (method_exists == 1) {
+		set_setting("sgx-method", TYPE_ID_STR, name);
+		sgx_destroy_enclave(eid);
+		return 0;
+	}
+
+	char methods_error[bufsize];
+	memset(methods_error, '\0', bufsize);
+
+	status = ecall_get_methods_error(eid, methods_error, bufsize);
+	if (status != SGX_SUCCESS) {
+		pr_fail("Unable to enter enclave, check SGX driver & PSW\n");
+		return -1;
+	}
+
+	(void)fprintf(stderr, methods_error);
+	sgx_destroy_enclave(eid);
+	return -1;
+}
+
+/*
  *  stress_sgx
  *	Various SGX-related stressors
  */
 int stress_sgx(const args_t *args)
 {
-	stress_cpu_method_info_t* method;
-	get_setting("cpu-method", &method);
-	pr_dbg("Method will be %s\n", method->name);
-
+	char* method;
+	get_setting("sgx-method", &method);
+	pr_dbg("Method will be %s\n", method);
 
 	sgx_enclave_id_t eid = 0;
 	sgx_status_t status = 0;
@@ -48,7 +91,7 @@ int stress_sgx(const args_t *args)
 
 	pr_dbg("Will ECALL into enclave\n");
 	int ret;
-	status = ecall_stress_cpu(eid, &ret, method->name, args->max_ops, (args->counter), &g_keep_stressing_flag, g_opt_flags);
+	status = ecall_stress_cpu(eid, &ret, method, args->max_ops, (args->counter), &g_keep_stressing_flag, g_opt_flags);
 	if (status != SGX_SUCCESS) {
 		print_error_message(status);
 		abort();

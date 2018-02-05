@@ -137,6 +137,7 @@ static const proc_helper_t proc_destroy[] = {
 static const stressor_default_t stressor_default[] = {
 	{ "all",	stress_set_cpu_method },
 	{ "uint64",	stress_set_funccall_method },
+	{ "all",	stress_set_sgx_method },
 	{ "all",	stress_set_str_method },
 	{ "all",	stress_set_wcs_method },
 	{ "all",	stress_set_matrix_method },
@@ -817,6 +818,8 @@ static const struct option long_options[] = {
 	{ "sendfile-size",1,	0,	OPT_SENDFILE_SIZE },
 	{ "sequential",	1,	0,	OPT_SEQUENTIAL },
 	{ "sgx",	1,	0,	OPT_SGX },
+	{ "sgx-ops",	1,	0,	OPT_SGX_OPS },
+	{ "sgx-method",	1,	0,	OPT_SGX_METHOD },
 	{ "shm",	1,	0,	OPT_SHM_POSIX },
 	{ "shm-ops",	1,	0,	OPT_SHM_POSIX_OPS },
 	{ "shm-bytes",	1,	0,	OPT_SHM_POSIX_BYTES },
@@ -1398,6 +1401,8 @@ static const help_t help_stressors[] = {
 	{ NULL,		"sendfile-ops N",	"stop after N bogo sendfile operations" },
 	{ NULL,		"sendfile-size N",	"size of data to be sent with sendfile" },
 	{ NULL,		"sgx N",			"start N SGX enclaves" },
+	{ NULL,		"sgx-ops N",		"stop after N sgx cpu bogo operations" },
+	{ NULL,		"sgx-method M",		"specify stress sgx method M, default is all" },
 	{ NULL,		"shm N",		"start N workers that exercise POSIX shared memory" },
 	{ NULL,		"shm-ops N",		"stop after N POSIX shared memory bogo operations" },
 	{ NULL,		"shm-bytes N",		"allocate/free N bytes of POSIX shared memory" },
@@ -3315,6 +3320,10 @@ next_opt:
 			stress_get_processors(&g_opt_sequential);
 			check_range("sequential", g_opt_sequential,
 				MIN_SEQUENTIAL, MAX_SEQUENTIAL);
+			break;
+		case OPT_SGX_METHOD:
+			if (stress_set_sgx_method(optarg) < 0)
+				return EXIT_FAILURE;
 			break;
 		case OPT_SHM_POSIX_BYTES:
 			stress_set_shm_posix_bytes(optarg);

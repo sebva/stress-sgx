@@ -2263,7 +2263,6 @@ static const stress_cpu_method_info_t cpu_methods[] = {
 	{ "dither",		stress_cpu_dither },
 	{ "djb2a",		stress_cpu_djb2a },
 	{ "double",		stress_cpu_double },
-	{ "enclavetransitions", stress_cpu_double },
 	{ "euler",		stress_cpu_euler },
 	{ "explog",		stress_cpu_explog },
 	{ "fft",		stress_cpu_fft },
