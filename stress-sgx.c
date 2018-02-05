@@ -19,6 +19,11 @@ void ocall_pr_fail(const char* str)
 	pr_fail(str);
 }
 
+uint64_t ocall_dummy(uint64_t param)
+{
+	return param + 1;
+}
+
 /*
  *  stress_sgx
  *	Various SGX-related stressors

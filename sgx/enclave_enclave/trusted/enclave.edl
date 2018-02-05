@@ -2,7 +2,8 @@
 
 enclave {
     untrusted {
-    		void ocall_pr_fail([in, string] const char* str); 
+    		void ocall_pr_fail([in, string] const char* str);
+    		uint64_t ocall_dummy(uint64_t param);
     };
 
     trusted {

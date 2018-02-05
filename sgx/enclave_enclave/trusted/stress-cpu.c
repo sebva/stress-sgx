@@ -2154,6 +2154,24 @@ static void stress_cpu_stats(const char *name)
 			name, am, max);
 }
 
+static void stress_cpu_enclave_transitions(const char *name)
+{
+	uint64_t result;
+	int status;
+
+	status = ocall_dummy(&result, 10000UL);
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) && (status != SGX_SUCCESS))
+	{
+		pr_fail("%s: Error %d with OCALL\n", name, status);
+	}
+	uint64_put(result);
+
+	if ((g_opt_flags & OPT_FLAGS_VERIFY) &&
+		(uint64_val != 10001UL)) {
+		pr_fail("%s: OCALL " PRIu64 " != 10000\n", name, result);
+	}
+}
+
 /*
  *  stress_cpu_all()
  *	iterate over all cpu stressors
@@ -2191,6 +2209,7 @@ static const stress_cpu_method_info_t cpu_methods[] = {
 	{ "dither",		stress_cpu_dither },
 	{ "djb2a",		stress_cpu_djb2a },
 	{ "double",		stress_cpu_double },
+	{ "enclavetransitions", stress_cpu_enclave_transitions },
 	{ "euler",		stress_cpu_euler },
 	{ "explog",		stress_cpu_explog },
 	{ "fft",		stress_cpu_fft },
