@@ -34,7 +34,7 @@
 #endif
 
 # define TOKEN_FILENAME   "stress-sgx.token"
-# define ENCLAVE_FILENAME "enclave.signed.so"
+# define ENCLAVE_CPU_FILENAME "enclave_cpu.signed.so"
 
 int initialize_enclave(sgx_enclave_id_t* eid);
 void print_error_message(sgx_status_t ret);

@@ -18,7 +18,7 @@
  */
 #include "stress-ng.h"
 #include "sgx/utils.h"
-#include "sgx/enclave_enclave/untrusted/enclave_u.h"
+#include "sgx/enclave_cpu/untrusted/enclave_u.h"
 
 typedef void (*stress_cpu_func)(const char *name);
 typedef struct {

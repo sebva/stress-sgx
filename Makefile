@@ -323,10 +323,10 @@ sgx/utils.o: sgx/utils.c sgx/utils.h
 
 enclave.signed.so:
 	$(MAKE) -f sgx/Makefile SGX_MODE=$(SGX_MODE) SGX_DEBUG=$(SGX_DEBUG) SGX_PRERELEASE=$(SGX_PRERELEASE)
-	cp --reflink=auto sgx/enclave_enclave/enclave.signed.so enclave.signed.so
+	cp --reflink=auto sgx/enclave_cpu/enclave.signed.so enclave_cpu.signed.so
 
 stress-ng: sgx/utils.o enclave.signed.so $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_enclave/untrusted/enclave_u.o -lm $(LDFLAGS) -lc -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_*/untrusted/enclave_u.o -lm $(LDFLAGS) -lc -o $@
 
 #
 #  generate apparmor data using minimal core utils tools from apparmor
