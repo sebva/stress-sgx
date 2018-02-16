@@ -60,7 +60,7 @@ endif
 
 Crypto_Library_Name := sgx_tcrypto
 
-Vm_C_Files := trusted/vm.c 
+Vm_C_Files := trusted/vm.c trusted/stress-vm.c trusted/mincore.c trusted/companion.c
 Vm_Include_Paths := -IInclude -Itrusted -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/libcxx
 
 include ../../config
@@ -118,12 +118,12 @@ trusted/vm_t.o: ./trusted/vm_t.c
 	$(CC) $(Vm_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
-trusted/%.o: trusted/%.c ../../config
+trusted/%.o: trusted/%.c ../../config trusted/stress-vm.h trusted/companion.h
 	$(CC) $(Vm_C_Flags) -c $< -o $@
 	@echo "CC  <=  $<"
 
 enclave_vm.so: trusted/vm_t.o $(Vm_C_Objects)
-	$(CXX) $^ -o $@ $(Vm_Link_Flags)
+	$(CC) $^ -o $@ $(Vm_Link_Flags)
 	@echo "LINK =>  $@"
 
 enclave_vm.signed.so: enclave_vm.so

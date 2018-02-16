@@ -21,6 +21,8 @@
 
 enclave {
     untrusted {
+    		void ocall_pr_dbg([in, string] const char* str);
+    		void ocall_pr_fail([in, string] const char* str);
     };
 
     trusted {
