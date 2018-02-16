@@ -54,7 +54,7 @@ int stress_set_sgx_method(const char *name)
 	sgx_status_t status;
 
 	/* Initialize the enclave */
-	status = initialize_enclave(&eid);
+	status = initialize_enclave(&eid, ENCLAVE_CPU_FILENAME, TOKEN_CPU_FILENAME);
 	if (status != SGX_SUCCESS) {
 		printf("Error %d\n", status);
 		return -1;
@@ -100,7 +100,7 @@ int stress_sgx(const args_t *args)
 	sgx_status_t status = 0;
 
 	/* Initialize the enclave */
-	status = initialize_enclave(&eid);
+	status = initialize_enclave(&eid, ENCLAVE_CPU_FILENAME, TOKEN_CPU_FILENAME);
 	if (status != SGX_SUCCESS){
 		printf("Error %d\n", status);
 		return -1;

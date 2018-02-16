@@ -89,15 +89,15 @@ endif
 .PHONY: all run
 
 ifeq ($(Build_Mode), HW_RELEASE)
-all: enclave.so
-	@echo "Build enclave enclave.so [$(Build_Mode)|$(SGX_ARCH)] success!"
+all: enclave_cpu.so
+	@echo "Build enclave enclave_cpu.so [$(Build_Mode)|$(SGX_ARCH)] success!"
 	@echo
 	@echo "*********************************************************************************************************************************************************"
 	@echo "PLEASE NOTE: In this mode, please sign the enclave.so first using Two Step Sign mechanism before you run the app to launch and access the enclave."
 	@echo "*********************************************************************************************************************************************************"
 	@echo
 else
-all: enclave.signed.so
+all: enclave_cpu.signed.so
 endif
 
 run: all
@@ -121,12 +121,12 @@ trusted/%.o: trusted/%.c trusted/stress-cpu.c ../../config
 	$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC  <=  $<"
 
-enclave.so: trusted/enclave_t.o $(Enclave_C_Objects)
+enclave_cpu.so: trusted/enclave_t.o $(Enclave_C_Objects)
 	$(CC) $^ -o $@ $(Enclave_Link_Flags)
 	@echo "LINK =>  $@"
 
-enclave.signed.so: enclave.so
-	@$(SGX_ENCLAVE_SIGNER) sign -key trusted/enclave_private.pem -enclave enclave.so -out $@ -config trusted/enclave.config.xml
+enclave_cpu.signed.so: enclave_cpu.so
+	@$(SGX_ENCLAVE_SIGNER) sign -key trusted/enclave_private.pem -enclave enclave_cpu.so -out $@ -config trusted/enclave.config.xml
 	@echo "SIGN =>  $@"
 clean:
 	@rm -f enclave.* trusted/enclave_t.*  $(Enclave_C_Objects)

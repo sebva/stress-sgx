@@ -33,10 +33,12 @@
 # define NULL 0
 #endif
 
-# define TOKEN_FILENAME   "stress-sgx.token"
+# define TOKEN_CPU_FILENAME   "stress-sgx-cpu.token"
 # define ENCLAVE_CPU_FILENAME "enclave_cpu.signed.so"
+# define TOKEN_VM_FILENAME   "stress-sgx-vm.token"
+# define ENCLAVE_VM_FILENAME "enclave_vm.signed.so"
 
-int initialize_enclave(sgx_enclave_id_t* eid);
+int initialize_enclave(sgx_enclave_id_t* eid, char* enclave_file, char* enclave_token);
 void print_error_message(sgx_status_t ret);
 
 #endif

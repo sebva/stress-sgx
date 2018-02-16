@@ -321,11 +321,11 @@ OBJS += $(CONFIG_OBJS)
 sgx/utils.o: sgx/utils.c sgx/utils.h
 	$(CC) $(CFLAGS) -c -o $@ sgx/utils.c
 
-enclave.signed.so:
+enclave_cpu.signed.so:
 	$(MAKE) -f sgx/Makefile SGX_MODE=$(SGX_MODE) SGX_DEBUG=$(SGX_DEBUG) SGX_PRERELEASE=$(SGX_PRERELEASE)
-	cp --reflink=auto sgx/enclave_cpu/enclave.signed.so enclave_cpu.signed.so
+	cp --reflink=auto sgx/enclave_cpu/enclave_cpu.signed.so enclave_cpu.signed.so
 
-stress-ng: sgx/utils.o enclave.signed.so $(OBJS)
+stress-ng: sgx/utils.o sgx/enclave_*/untrusted/enclave_u.o $(OBJS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_*/untrusted/enclave_u.o -lm $(LDFLAGS) -lc -o $@
 
 #
