@@ -269,6 +269,7 @@ again:
 		sgx_enclave_id_t eid = 0;
 		sgx_status_t status = 0;
 
+		pr_dbg("Initializing enclave\n");
 		/* Initialize the enclave */
 		status = initialize_enclave(&eid, ENCLAVE_VM_FILENAME, TOKEN_VM_FILENAME);
 		if (status != SGX_SUCCESS){
@@ -277,8 +278,8 @@ again:
 		}
 
 		pr_dbg("Will ECALL into enclave\n");
-		int ret;
-		status = ecall_stress_vm(eid, &ret, vm_bytes, vm_method, args->max_ops,
+		int ecall_ret;
+		status = ecall_stress_vm(eid, &ecall_ret, vm_bytes, vm_method, args->max_ops,
 				args->counter, &g_keep_stressing_flag, g_opt_flags,
 				bit_error_count, page_size, vm_hang);
 		if (status != SGX_SUCCESS) {
