@@ -827,14 +827,7 @@ static const struct option long_options[] = {
 	{ "sgx-vm-bytes",	1,	0,	OPT_SGX_VM_BYTES },
 	{ "sgx-vm-hang",	1,	0,	OPT_SGX_VM_HANG },
 	{ "sgx-vm-keep",	0,	0,	OPT_SGX_VM_KEEP },
-#if defined(MAP_POPULATE)
-	{ "sgx-vm-populate",0,	0,	OPT_SGX_VM_MMAP_POPULATE },
-#endif
-#if defined(MAP_LOCKED)
-	{ "sgx-vm-locked",	0,	0,	OPT_SGX_VM_MMAP_LOCKED },
-#endif
 	{ "sgx-vm-ops",	1,	0,	OPT_SGX_VM_OPS },
-	{ "sgx-vm-madvise",	1,	0,	OPT_SGX_VM_MADVISE },
 	{ "sgx-vm-method",	1,	0,	OPT_SGX_VM_METHOD },
 	{ "shm",	1,	0,	OPT_SHM_POSIX },
 	{ "shm-ops",	1,	0,	OPT_SHM_POSIX_OPS },
@@ -1419,19 +1412,12 @@ static const help_t help_stressors[] = {
 	{ NULL,		"sgx N",			"start N SGX enclaves" },
 	{ NULL,		"sgx-ops N",		"stop after N sgx cpu bogo operations" },
 	{ NULL,		"sgx-method M",		"specify stress sgx method M, default is all" },
-	{ NULL,		"sgx-vm N",			"start N workers spinning on anonymous mmap" },
-	{ NULL,		"sgx-vm-bytes N",		"allocate N bytes per vm worker (default 256MB)" },
+	{ NULL,		"sgx-vm N",			"start N SGX enclaves spinning on trusted memory" },
+	{ NULL,		"sgx-vm-bytes N",		"allocate N bytes per vm worker (default 32MB)" },
 	{ NULL,		"sgx-vm-hang N",		"sleep N seconds before freeing memory" },
 	{ NULL,		"sgx-vm-keep",		"redirty memory instead of reallocating" },
 	{ NULL,		"sgx-vm-ops N",		"stop after N vm bogo operations" },
-#if defined(MAP_LOCKED)
-	{ NULL,		"sgx-vm-locked",		"lock the pages of the mapped region into memory" },
-#endif
-	{ NULL,		"sgx-vm-madvise M",		"specify mmap'd vm buffer madvise advice" },
 	{ NULL,		"sgx-vm-method M",		"specify stress vm method M, default is all" },
-#if defined(MAP_POPULATE)
-	{ NULL,		"sgx-vm-populate",		"populate (prefault) page tables for a mapping" },
-#endif
 	{ NULL,		"shm N",		"start N workers that exercise POSIX shared memory" },
 	{ NULL,		"shm-ops N",		"stop after N POSIX shared memory bogo operations" },
 	{ NULL,		"shm-bytes N",		"allocate/free N bytes of POSIX shared memory" },
@@ -3363,24 +3349,10 @@ next_opt:
 		case OPT_SGX_VM_KEEP:
 			g_opt_flags |= OPT_FLAGS_SGX_VM_KEEP;
 			break;
-		case OPT_SGX_VM_MADVISE:
-			if (stress_set_sgx_vm_madvise(optarg) < 0)
-				return EXIT_FAILURE;
-			break;
 		case OPT_SGX_VM_METHOD:
 			if (stress_set_sgx_vm_method(optarg) < 0)
 				return EXIT_FAILURE;
 			break;
-#if defined(MAP_LOCKED)
-		case OPT_SGX_VM_MMAP_LOCKED:
-			stress_set_sgx_vm_flags(MAP_LOCKED);
-			break;
-#endif
-#if defined(MAP_POPULATE)
-		case OPT_SGX_VM_MMAP_POPULATE:
-			stress_set_sgx_vm_flags(MAP_POPULATE);
-			break;
-#endif
 		case OPT_SHM_POSIX_BYTES:
 			stress_set_shm_posix_bytes(optarg);
 			break;

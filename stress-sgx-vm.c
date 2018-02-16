@@ -20,48 +20,9 @@
 #include "sgx/utils.h"
 #include "sgx/enclave_vm/untrusted/vm_u.h"
 
-typedef struct {
-	const char *name;
-        const int advice;
-} vm_madvise_info_t;
-
 #define VM_BOGO_SHIFT		(12)
+#define DEFAULT_SGX_VM_BYTES	(32 * MB)
 
-static const vm_madvise_info_t vm_madvise_info[] = {
-#if defined(HAVE_MADVISE)
-#if defined(MADV_DONTNEED)
-	{ "dontneed",	MADV_DONTNEED},
-#endif
-#if defined(MADV_HUGEPAGE)
-	{ "hugepage",	MADV_HUGEPAGE },
-#endif
-#if defined(MADV_MERGEABLE)
-	{ "mergeable",	MADV_MERGEABLE },
-#endif
-#if defined(MADV_NOHUGEPAGE)
-	{ "nohugepage",	MADV_NOHUGEPAGE },
-#endif
-#if defined(MADV_NORMAL)
-	{ "normal",	MADV_NORMAL },
-#endif
-#if defined(MADV_RANDOM)
-	{ "random",	MADV_RANDOM },
-#endif
-#if defined(MADV_SEQUENTIAL)
-	{ "sequential",	MADV_SEQUENTIAL },
-#endif
-#if defined(MADV_UNMERGEABLE)
-	{ "unmergeable",MADV_UNMERGEABLE },
-#endif
-#if defined(MADV_WILLNEED)
-	{ "willneed",	MADV_WILLNEED},
-#endif
-        { NULL,         0 },
-#else
-	/* No MADVISE, default to normal, ignored */
-	{ "normal",	0 },
-#endif
-};
 
 void ocall_sleep(int seconds)
 {
@@ -92,35 +53,6 @@ void stress_set_sgx_vm_bytes(const char *opt)
 		MIN_VM_BYTES, MAX_MEM_LIMIT);
 	set_setting("sgx-vm-bytes", TYPE_ID_SIZE_T, &vm_bytes);
 }
-
-void stress_set_sgx_vm_flags(const int flag)
-{
-	int vm_flags = 0;
-
-	(void)get_setting("sgx-vm-flags", &vm_flags);
-	vm_flags |= flag;
-	set_setting("sgx-vm-flags", TYPE_ID_INT, &vm_flags);
-
-}
-
-int stress_set_sgx_vm_madvise(const char *opt)
-{
-	const vm_madvise_info_t *info;
-
-	for (info = vm_madvise_info; info->name; info++) {
-		if (!strcmp(opt, info->name)) {
-			set_setting("sgx-vm-madvise", TYPE_ID_INT, &info->advice);
-			return 0;
-		}
-	}
-	fprintf(stderr, "invalid vm-madvise advice '%s', allowed advice options are:", opt);
-	for (info = vm_madvise_info; info->name; info++) {
-		fprintf(stderr, " %s", info->name);
-        }
-	fprintf(stderr, "\n");
-	return -1;
-}
-
 
 /*
  *  stress_set_vm_method()
@@ -175,17 +107,15 @@ int stress_sgx_vm(const args_t *args)
 	uint64_t *bit_error_count = MAP_FAILED;
 	uint64_t vm_hang = DEFAULT_VM_HANG;
 	uint32_t restarts = 0, nomems = 0;
-	size_t vm_bytes = DEFAULT_VM_BYTES;
+	size_t vm_bytes = DEFAULT_SGX_VM_BYTES;
 	char* vm_method;
 	pid_t pid;
 	const size_t page_size = args->page_size;
 	size_t retries;
 	int err = 0, ret = EXIT_SUCCESS;
-	int vm_flags = 0;                      /* VM mmap flags */
 	int vm_madvise = -1;
 
 	(void)get_setting("sgx-vm-hang", &vm_hang);
-	(void)get_setting("sgx-vm-flags", &vm_flags);
 	(void)get_setting("sgx-vm-method", &vm_method);
 	(void)get_setting("sgx-vm-madvise", &vm_madvise);
 

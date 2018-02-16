@@ -1954,10 +1954,7 @@ typedef enum {
 	OPT_SGX_VM_BYTES,
 	OPT_SGX_VM_HANG,
 	OPT_SGX_VM_KEEP,
-	OPT_SGX_VM_MMAP_POPULATE,
-	OPT_SGX_VM_MMAP_LOCKED,
 	OPT_SGX_VM_OPS,
-	OPT_SGX_VM_MADVISE,
 	OPT_SGX_VM_METHOD,
 
 	OPT_SHM_POSIX,
@@ -2690,7 +2687,6 @@ extern int  stress_set_sgx_method(const char *name);
 extern void stress_set_sgx_vm_bytes(const char *opt);
 extern void stress_set_sgx_vm_flags(const int flag);
 extern void stress_set_sgx_vm_hang(const char *opt);
-extern int  stress_set_sgx_vm_madvise(const char *name);
 extern int  stress_set_sgx_vm_method(const char *name);
 extern void stress_set_shm_posix_bytes(const char *opt);
 extern void stress_set_shm_posix_objects(const char *opt);
