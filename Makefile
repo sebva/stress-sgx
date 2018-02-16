@@ -294,7 +294,7 @@ LIB_SCTP = -lsctp
 -include config
 ifneq ("$(wildcard config)","")
 all: all_config
-.PHONY: all_config enclave.signed.so
+.PHONY: all_config enclave_cpu.signed.so enclave_vm.signed.so
 all_config:
 	$(MAKE) -f Makefile.config
 	$(MAKE) stress-ng
@@ -321,11 +321,12 @@ OBJS += $(CONFIG_OBJS)
 sgx/utils.o: sgx/utils.c sgx/utils.h
 	$(CC) $(CFLAGS) -c -o $@ sgx/utils.c
 
-enclave_cpu.signed.so:
+enclave_cpu.signed.so enclave_vm.signed.so sgx/enclave_*/untrusted/enclave_u.o:
 	$(MAKE) -f sgx/Makefile SGX_MODE=$(SGX_MODE) SGX_DEBUG=$(SGX_DEBUG) SGX_PRERELEASE=$(SGX_PRERELEASE)
-	cp --reflink=auto sgx/enclave_cpu/enclave_cpu.signed.so enclave_cpu.signed.so
+	cp --preserve=all --reflink=auto sgx/enclave_cpu/enclave_cpu.signed.so enclave_cpu.signed.so
+	cp --preserve=all --reflink=auto sgx/enclave_vm/enclave_vm.signed.so enclave_vm.signed.so
 
-stress-ng: sgx/utils.o sgx/enclave_*/untrusted/enclave_u.o $(OBJS)
+stress-ng: sgx/utils.o sgx/enclave_*/untrusted/enclave_u.o enclave_cpu.signed.so enclave_vm.signed.so $(OBJS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_*/untrusted/enclave_u.o -lm $(LDFLAGS) -lc -o $@
 
 #
