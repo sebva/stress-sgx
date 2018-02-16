@@ -122,7 +122,7 @@ int stress_sgx(const args_t *args)
 	case 0:
 		return EXIT_SUCCESS;
 	case -1:
-		printf("Please set --cpu-method first\n");
+		printf("Please set --sgx-method first\n");
 	}
 
 	return EXIT_FAILURE;
