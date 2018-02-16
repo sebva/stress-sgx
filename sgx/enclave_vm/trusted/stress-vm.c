@@ -32,20 +32,7 @@
  */
 #define INJECT_BIT_ERRORS	(0)
 
-#define VM_BOGO_SHIFT		(12)
 #define VM_ROWHAMMER_LOOPS	(1000000)
-
-#define NO_MEM_RETRIES_MAX	(100)
-
-/*
- *  keep_stressing()
- *	returns true if we can keep on running a stressor
- */
-static bool HOT OPTIMIZE3 keep_stressing_vm(const args_t *args)
-{
-	return (LIKELY((*g_keep_stressing_flag)) &&
-	        LIKELY(!args->max_ops || ((*args->counter >> VM_BOGO_SHIFT) < args->max_ops)));
-}
 
 
 #define SET_AND_TEST(ptr, val, bit_errors)	\

@@ -63,7 +63,15 @@ static const vm_madvise_info_t vm_madvise_info[] = {
 #endif
 };
 
+void ocall_sleep(int seconds)
+{
+	sleep(seconds);
+}
 
+int ocall_shim_usleep(uint64_t usec)
+{
+	return shim_usleep(usec);
+}
 
 void stress_set_sgx_vm_hang(const char *opt)
 {
@@ -168,12 +176,10 @@ int stress_sgx_vm(const args_t *args)
 	uint64_t vm_hang = DEFAULT_VM_HANG;
 	uint32_t restarts = 0, nomems = 0;
 	size_t vm_bytes = DEFAULT_VM_BYTES;
-	uint8_t *buf = NULL;
 	char* vm_method;
 	pid_t pid;
-	const bool keep = (g_opt_flags & OPT_FLAGS_SGX_VM_KEEP);
-        const size_t page_size = args->page_size;
-	size_t buf_sz, retries;
+	const size_t page_size = args->page_size;
+	size_t retries;
 	int err = 0, ret = EXIT_SUCCESS;
 	int vm_flags = 0;                      /* VM mmap flags */
 	int vm_madvise = -1;
@@ -194,7 +200,6 @@ int stress_sgx_vm(const args_t *args)
 	vm_bytes /= args->num_instances;
 	if (vm_bytes < MIN_VM_BYTES)
 		vm_bytes = MIN_VM_BYTES;
-	buf_sz = vm_bytes & ~(page_size - 1);
 
 	for (retries = 0; (retries < 100) && g_keep_stressing_flag; retries++) {
 		bit_error_count = (uint64_t *)
@@ -255,62 +260,34 @@ again:
 			}
 		}
 	} else if (pid == 0) {
-		int no_mem_retries = 0;
-
 		(void)setpgid(0, g_pgrp);
 		stress_parent_died_alarm();
 
 		/* Make sure this is killable by OOM killer */
 		set_oom_adjustment(args->name, true);
 
-		/* TODO Enter enclave and stress
-		do {
-			if (no_mem_retries >= NO_MEM_RETRIES_MAX) {
-				pr_err("%s: gave up trying to mmap, no available memory\n",
-					args->name);
-				break;
-			}
-			if (!keep || (buf == NULL)) {
-				if (!g_keep_stressing_flag)
-					return EXIT_SUCCESS;
-				buf = (uint8_t *)mmap(NULL, buf_sz,
-					PROT_READ | PROT_WRITE,
-					MAP_PRIVATE | MAP_ANONYMOUS |
-					vm_flags, -1, 0);
-				if (buf == MAP_FAILED) {
-					buf = NULL;
-					no_mem_retries++;
-					(void)shim_usleep(100000);
-					continue;	/* Try again *//*
-				}
-				if (vm_madvise < 0)
-					(void)madvise_random(buf, buf_sz);
-				else
-					(void)shim_madvise(buf, buf_sz, vm_madvise);
-			}
+		sgx_enclave_id_t eid = 0;
+		sgx_status_t status = 0;
 
-			no_mem_retries = 0;
-			(void)mincore_touch_pages(buf, buf_sz);
-			*bit_error_count += func(buf, buf_sz, args->counter,
-						args->max_ops << VM_BOGO_SHIFT);
+		/* Initialize the enclave */
+		status = initialize_enclave(&eid, ENCLAVE_VM_FILENAME, TOKEN_VM_FILENAME);
+		if (status != SGX_SUCCESS){
+			printf("Error %d\n", status);
+			return -1;
+		}
 
-			if (vm_hang == 0) {
-				for (;;) {
-					(void)sleep(3600);
-				}
-			} else if (vm_hang != DEFAULT_VM_HANG) {
-				(void)sleep((int)vm_hang);
-			}
+		pr_dbg("Will ECALL into enclave\n");
+		int ret;
+		status = ecall_stress_vm(eid, &ret, vm_bytes, vm_method, args->max_ops,
+				args->counter, &g_keep_stressing_flag, g_opt_flags,
+				bit_error_count, page_size, vm_hang);
+		if (status != SGX_SUCCESS) {
+			print_error_message(status);
+			abort();
+		}
 
-			if (!keep) {
-				(void)madvise_random(buf, buf_sz);
-				(void)munmap((void *)buf, buf_sz);
-			}
-		} while (keep_stressing_vm(args));
-		*/
-
-		if (keep && buf != NULL)
-			(void)munmap((void *)buf, buf_sz);
+		sgx_destroy_enclave(eid);
+		pr_dbg("Enclave destroyed\n");
 
 		_exit(EXIT_SUCCESS);
 	}

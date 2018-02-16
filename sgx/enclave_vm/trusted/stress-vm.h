@@ -27,6 +27,7 @@
 bool* g_keep_stressing_flag;
 uint64_t g_opt_flags;
 
+
 /*
  *  the VM stress test has diffent methods of vm stressor
  */

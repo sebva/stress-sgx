@@ -26,13 +26,18 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
-#define OPT_FLAGS_MMAP_MINCORE	 0x00000000008000ULL	/* mincore force pages into mem */
-#define OPT_FLAGS_VERIFY	 0x00000000002000ULL	/* verify mode */
-
 #define OPTIMIZE3 	__attribute__((optimize("-O3")))
 
 #define HOT		__attribute__ ((hot))
 #define LIKELY(x)	__builtin_expect((x),1)
+
+#define OPT_FLAGS_MMAP_MINCORE	 0x00000000008000ULL	/* mincore force pages into mem */
+#define OPT_FLAGS_VERIFY	 0x00000000002000ULL	/* verify mode */
+#define OPT_FLAGS_SGX_VM_KEEP	 0x40000000000000ULL	/* Don't keep re-allocating */
+
+#define VM_BOGO_SHIFT		(12)
+
+#define DEFAULT_VM_HANG		(~0ULL)
 
 #define PAGE_4K_SHIFT		(12)
 #define PAGE_4K			(1 << PAGE_4K_SHIFT)

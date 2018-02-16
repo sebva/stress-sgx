@@ -37,6 +37,11 @@ void ocall_pr_fail(const char* str)
 	pr_fail(str);
 }
 
+void ocall_pr_err(const char* str)
+{
+	pr_err(str);
+}
+
 void ocall_pr_dbg(const char* str)
 {
 	pr_dbg(str);

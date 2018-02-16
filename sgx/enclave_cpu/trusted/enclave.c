@@ -62,8 +62,8 @@ void ecall_get_cpu_methods_error(char* out_methods, int length)
 	}
 }
 
-int ecall_stress_cpu(const char* method_name, const uint64_t rounds, uint64_t *const counter , bool* keep_stressing_flag, uint64_t opt_flags)
-{
+int ecall_stress_cpu(const char* method_name, const uint64_t rounds,
+		uint64_t * const counter, bool* keep_stressing_flag, uint64_t opt_flags) {
 	stress_cpu_method_info_t const *info;
 
 	g_opt_flags = opt_flags;
