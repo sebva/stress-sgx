@@ -192,6 +192,7 @@ STRESS_SRC = \
 	stress-sem-sysv.c \
 	stress-sendfile.c \
 	stress-sgx.c \
+	stress-sgx-vm.c \
 	stress-shm.c \
 	stress-shm-sysv.c \
 	stress-sigfd.c \
@@ -326,8 +327,8 @@ enclave_cpu.signed.so enclave_vm.signed.so sgx/enclave_*/untrusted/enclave_u.o:
 	cp --preserve=all --reflink=auto sgx/enclave_cpu/enclave_cpu.signed.so enclave_cpu.signed.so
 	cp --preserve=all --reflink=auto sgx/enclave_vm/enclave_vm.signed.so enclave_vm.signed.so
 
-stress-ng: sgx/utils.o sgx/enclave_*/untrusted/enclave_u.o enclave_cpu.signed.so enclave_vm.signed.so $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_*/untrusted/enclave_u.o -lm $(LDFLAGS) -lc -o $@
+stress-ng: sgx/utils.o sgx/enclave_*/untrusted/*_u.o enclave_cpu.signed.so enclave_vm.signed.so $(OBJS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_*/untrusted/*_u.o -lm $(LDFLAGS) -lc -o $@
 
 #
 #  generate apparmor data using minimal core utils tools from apparmor

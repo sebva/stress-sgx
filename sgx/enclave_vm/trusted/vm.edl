@@ -26,6 +26,7 @@ enclave {
     };
 
     trusted {
-    	    public int ecall_vm_sample();
+    	    public int ecall_vm_method_exists([in, string] const char* method_name);
+    	    public void ecall_get_vm_methods_error([user_check] char* out_methods, int length);
     };
 };

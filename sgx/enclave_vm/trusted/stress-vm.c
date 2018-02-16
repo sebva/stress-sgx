@@ -37,9 +37,6 @@
 
 #define NO_MEM_RETRIES_MAX	(100)
 
-
-static const stress_vm_method_info_t vm_methods[];
-
 /*
  *  keep_stressing()
  *	returns true if we can keep on running a stressor
@@ -1790,7 +1787,7 @@ static size_t stress_vm_all(
 	return bit_errors;
 }
 
-static const stress_vm_method_info_t vm_methods[] = {
+const stress_vm_method_info_t vm_methods[] = {
 	{ "all",	stress_vm_all },
 	{ "flip",	stress_vm_flip },
 	{ "galpat-0",	stress_vm_galpat_zero },

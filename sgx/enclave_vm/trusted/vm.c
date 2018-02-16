@@ -19,9 +19,29 @@
 
 #include "vm_t.h"  /* print_string */
 #include "stress-vm.h"
+#include <stdio.h>
 
-int ecall_vm_sample()
+int ecall_vm_method_exists(const char* method_name)
 {
-  return 0;
+	stress_vm_method_info_t const *info;
+	for (info = vm_methods; info->func; info++) {
+		if (strcmp(info->name, method_name) == 0) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
+void ecall_get_vm_methods_error(char* out_methods, int length)
+{
+	stress_vm_method_info_t const *info;
+	int counter = 0;
+
+	if (sgx_is_outside_enclave(out_methods, length)) {
+		counter += snprintf(out_methods, length, "sgx-vm-method must be one of:");
+		for (info = vm_methods; info->func; info++) {
+			counter += snprintf(out_methods + counter, length - counter, " %s", info->name);
+		}
+		(void)snprintf(out_methods + counter, length - counter, "\n");
+	}
+}

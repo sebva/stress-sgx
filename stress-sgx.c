@@ -37,6 +37,11 @@ void ocall_pr_fail(const char* str)
 	pr_fail(str);
 }
 
+void ocall_pr_dbg(const char* str)
+{
+	pr_dbg(str);
+}
+
 uint64_t ocall_dummy(uint64_t param)
 {
 	return param + 1;
@@ -60,7 +65,7 @@ int stress_set_sgx_method(const char *name)
 		return -1;
 	}
 
-	status = ecall_method_exists(eid, &method_exists, name);
+	status = ecall_cpu_method_exists(eid, &method_exists, name);
 	if (status != SGX_SUCCESS) {
 		pr_fail("Unable to enter enclave, check SGX driver & PSW\n");
 		return -1;
@@ -75,7 +80,7 @@ int stress_set_sgx_method(const char *name)
 	char methods_error[bufsize];
 	memset(methods_error, '\0', bufsize);
 
-	status = ecall_get_methods_error(eid, methods_error, bufsize);
+	status = ecall_get_cpu_methods_error(eid, methods_error, bufsize);
 	if (status != SGX_SUCCESS) {
 		pr_fail("Unable to enter enclave, check SGX driver & PSW\n");
 		return -1;

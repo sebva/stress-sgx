@@ -38,5 +38,7 @@ typedef struct {
 	const stress_vm_func func;
 } stress_vm_method_info_t;
 
+extern const stress_vm_method_info_t vm_methods[];
+
 
 #endif /* ENCLAVE_VM_TRUSTED_STRESS_VM_H_ */
