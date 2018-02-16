@@ -1,6 +1,6 @@
 /*
  * Stress-SGX: Load and stress your enclaves for fun and profit
- * Copyright (C) 2017-2018 Sébastien Vaucher
+ * Copyright (C) 2018 Sébastien Vaucher
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -16,29 +16,30 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#ifndef __SGX_UTILS
-#define __SGX_UTILS
 
-#include <sgx_urts.h>
+#ifndef ENCLAVE_VM_TRUSTED_STRESS_VM_H_
+#define ENCLAVE_VM_TRUSTED_STRESS_VM_H_
 
-#ifndef TRUE
-# define TRUE 1
-#endif
+#include <sys/types.h>
+#include <stdbool.h>
 
-#ifndef FALSE
-# define FALSE 0
-#endif
 
-#ifndef NULL
-# define NULL 0
-#endif
+bool* g_keep_stressing_flag;
+uint64_t g_opt_flags;
 
-# define TOKEN_CPU_FILENAME   "stress-sgx-cpu.token"
-# define ENCLAVE_CPU_FILENAME "enclave_cpu.signed.so"
-# define TOKEN_VM_FILENAME   "stress-sgx-vm.token"
-# define ENCLAVE_VM_FILENAME "enclave_vm.signed.so"
 
-int initialize_enclave(sgx_enclave_id_t* eid, char* enclave_file, char* enclave_token);
-void print_error_message(sgx_status_t ret);
+/*
+ *  the VM stress test has diffent methods of vm stressor
+ */
+typedef size_t (*stress_vm_func)(uint8_t *buf, const size_t sz,
+		uint64_t *counter, const uint64_t max_ops);
 
-#endif
+typedef struct {
+	const char *name;
+	const stress_vm_func func;
+} stress_vm_method_info_t;
+
+extern const stress_vm_method_info_t vm_methods[];
+
+
+#endif /* ENCLAVE_VM_TRUSTED_STRESS_VM_H_ */

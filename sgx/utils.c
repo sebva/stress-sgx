@@ -135,7 +135,7 @@ void print_error_message(sgx_status_t ret)
  *   Step 2: call sgx_create_enclave to initialize an enclave instance
  *   Step 3: save the launch token if it is updated
  */
-int initialize_enclave(sgx_enclave_id_t* eid)
+int initialize_enclave(sgx_enclave_id_t* eid, char* enclave_file, char* enclave_token)
 {
     char token_path[MAX_PATH] = {'\0'};
     sgx_launch_token_t token = {0};
@@ -149,14 +149,14 @@ int initialize_enclave(sgx_enclave_id_t* eid)
     const char *home_dir = getpwuid(getuid())->pw_dir;
 
     if (home_dir != NULL &&
-        (strlen(home_dir)+strlen("/")+sizeof(TOKEN_FILENAME)+1) <= MAX_PATH) {
+        (strlen(home_dir)+strlen("/")+strlen(enclave_token)+1) <= MAX_PATH) {
         /* compose the token path */
         strncpy(token_path, home_dir, strlen(home_dir));
         strncat(token_path, "/", strlen("/"));
-        strncat(token_path, TOKEN_FILENAME, sizeof(TOKEN_FILENAME)+1);
+        strncat(token_path, enclave_token, strlen(enclave_token)+1);
     } else {
         /* if token path is too long or $HOME is NULL */
-        strncpy(token_path, TOKEN_FILENAME, sizeof(TOKEN_FILENAME));
+        strncpy(token_path, enclave_token, strlen(enclave_token));
     }
 
     FILE *fp = fopen(token_path, "rb");
@@ -175,7 +175,7 @@ int initialize_enclave(sgx_enclave_id_t* eid)
     }
     /* Step 2: call sgx_create_enclave to initialize an enclave instance */
     /* Debug Support: set 2nd parameter to 1 */
-    ret = sgx_create_enclave(ENCLAVE_FILENAME, SGX_DEBUG_FLAG, &token, &updated, eid, NULL);
+    ret = sgx_create_enclave(enclave_file, SGX_DEBUG_FLAG, &token, &updated, eid, NULL);
     if (ret != SGX_SUCCESS) {
         print_error_message(ret);
         if (fp != NULL) fclose(fp);

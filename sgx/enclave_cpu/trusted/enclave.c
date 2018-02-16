@@ -37,7 +37,7 @@ void run_stressor(const stress_cpu_method_info_t* info, const uint64_t rounds, u
 	} while(keep_stressing(rounds, counter));
 }
 
-int ecall_method_exists(const char* method_name)
+int ecall_cpu_method_exists(const char* method_name)
 {
 	stress_cpu_method_info_t const *info;
 	for (info = cpu_methods; info->func; info++) {
@@ -48,7 +48,7 @@ int ecall_method_exists(const char* method_name)
 	return 0;
 }
 
-void ecall_get_methods_error(char* out_methods, int length)
+void ecall_get_cpu_methods_error(char* out_methods, int length)
 {
 	stress_cpu_method_info_t const *info;
 	int counter = 0;
@@ -62,8 +62,8 @@ void ecall_get_methods_error(char* out_methods, int length)
 	}
 }
 
-int ecall_stress_cpu(const char* method_name, const uint64_t rounds, uint64_t *const counter , bool* keep_stressing_flag, uint64_t opt_flags)
-{
+int ecall_stress_cpu(const char* method_name, const uint64_t rounds,
+		uint64_t * const counter, bool* keep_stressing_flag, uint64_t opt_flags) {
 	stress_cpu_method_info_t const *info;
 
 	g_opt_flags = opt_flags;

@@ -262,6 +262,7 @@ typedef unsigned long int __kernel_ulong_t;
 #define OPT_FLAGS_OOMABLE	 0x08000000000000ULL	/* --oomable */
 #define OPT_FLAGS_ABORT		 0x10000000000000ULL	/* --abort */
 #define OPT_FLAGS_CPU_ONLINE_ALL 0x20000000000000ULL	/* --cpu-online-all */
+#define OPT_FLAGS_SGX_VM_KEEP	 0x40000000000000ULL	/* Don't keep re-allocating */
 
 #define OPT_FLAGS_CACHE_MASK		\
 	(OPT_FLAGS_CACHE_FLUSH |	\
@@ -1329,6 +1330,7 @@ typedef enum {
 	STRESS_SEMAPHORE_SYSV,
 	STRESS_SENDFILE,
 	STRESS_SGX,
+	STRESS_SGX_VM,
 	STRESS_SHM_POSIX,
 	STRESS_SHM_SYSV,
 	STRESS_SIGFD,
@@ -1947,6 +1949,13 @@ typedef enum {
 	OPT_SGX,
 	OPT_SGX_OPS,
 	OPT_SGX_METHOD,
+
+	OPT_SGX_VM,
+	OPT_SGX_VM_BYTES,
+	OPT_SGX_VM_HANG,
+	OPT_SGX_VM_KEEP,
+	OPT_SGX_VM_OPS,
+	OPT_SGX_VM_METHOD,
 
 	OPT_SHM_POSIX,
 	OPT_SHM_POSIX_OPS,
@@ -2675,6 +2684,10 @@ extern void stress_set_semaphore_posix_procs(const char *opt);
 extern void stress_set_semaphore_sysv_procs(const char *opt);
 extern void stress_set_sendfile_size(const char *opt);
 extern int  stress_set_sgx_method(const char *name);
+extern void stress_set_sgx_vm_bytes(const char *opt);
+extern void stress_set_sgx_vm_flags(const int flag);
+extern void stress_set_sgx_vm_hang(const char *opt);
+extern int  stress_set_sgx_vm_method(const char *name);
 extern void stress_set_shm_posix_bytes(const char *opt);
 extern void stress_set_shm_posix_objects(const char *opt);
 extern void stress_set_shm_sysv_bytes(const char *opt);
@@ -2998,6 +3011,7 @@ STRESS(stress_sem);
 STRESS(stress_sem_sysv);
 STRESS(stress_sendfile);
 STRESS(stress_sgx);
+STRESS(stress_sgx_vm);
 STRESS(stress_shm);
 STRESS(stress_shm_sysv);
 STRESS(stress_sigfd);

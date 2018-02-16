@@ -192,6 +192,7 @@ STRESS_SRC = \
 	stress-sem-sysv.c \
 	stress-sendfile.c \
 	stress-sgx.c \
+	stress-sgx-vm.c \
 	stress-shm.c \
 	stress-shm-sysv.c \
 	stress-sigfd.c \
@@ -294,7 +295,7 @@ LIB_SCTP = -lsctp
 -include config
 ifneq ("$(wildcard config)","")
 all: all_config
-.PHONY: all_config enclave.signed.so
+.PHONY: all_config enclave_cpu.signed.so enclave_vm.signed.so
 all_config:
 	$(MAKE) -f Makefile.config
 	$(MAKE) stress-ng
@@ -321,12 +322,13 @@ OBJS += $(CONFIG_OBJS)
 sgx/utils.o: sgx/utils.c sgx/utils.h
 	$(CC) $(CFLAGS) -c -o $@ sgx/utils.c
 
-enclave.signed.so:
+enclave_cpu.signed.so enclave_vm.signed.so sgx/enclave_*/untrusted/enclave_u.o:
 	$(MAKE) -f sgx/Makefile SGX_MODE=$(SGX_MODE) SGX_DEBUG=$(SGX_DEBUG) SGX_PRERELEASE=$(SGX_PRERELEASE)
-	cp --reflink=auto sgx/enclave_enclave/enclave.signed.so enclave.signed.so
+	cp --preserve=all --reflink=auto sgx/enclave_cpu/enclave_cpu.signed.so enclave_cpu.signed.so
+	cp --preserve=all --reflink=auto sgx/enclave_vm/enclave_vm.signed.so enclave_vm.signed.so
 
-stress-ng: sgx/utils.o enclave.signed.so $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_enclave/untrusted/enclave_u.o -lm $(LDFLAGS) -lc -o $@
+stress-ng: sgx/utils.o enclave_cpu.signed.so enclave_vm.signed.so $(OBJS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OBJS) sgx/utils.o sgx/enclave_cpu/untrusted/enclave_u.o sgx/enclave_vm/untrusted/vm_u.o -lm $(LDFLAGS) -lc -o $@
 
 #
 #  generate apparmor data using minimal core utils tools from apparmor

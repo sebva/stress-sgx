@@ -100,6 +100,7 @@ static const unsupported_t unsupported[] = {
 	{ STRESS_RAWDEV,	stress_rawdev_supported },
 	{ STRESS_RDRAND,	stress_rdrand_supported },
 	{ STRESS_SGX,		stress_sgx_supported },
+	{ STRESS_SGX_VM,		stress_sgx_supported },
 	{ STRESS_SOFTLOCKUP,	stress_softlockup_supported },
 	{ STRESS_SWAP,		stress_swap_supported },
 	{ STRESS_TSC,		stress_tsc_supported }
@@ -138,6 +139,7 @@ static const stressor_default_t stressor_default[] = {
 	{ "all",	stress_set_cpu_method },
 	{ "uint64",	stress_set_funccall_method },
 	{ "all",	stress_set_sgx_method },
+	{ "all",	stress_set_sgx_vm_method },
 	{ "all",	stress_set_str_method },
 	{ "all",	stress_set_wcs_method },
 	{ "all",	stress_set_matrix_method },
@@ -347,6 +349,7 @@ static const stress_t stressors[] = {
 	STRESSOR(sem_sysv, SEMAPHORE_SYSV, CLASS_OS | CLASS_SCHEDULER),
 	STRESSOR(sendfile, SENDFILE, CLASS_PIPE_IO | CLASS_OS),
 	STRESSOR(sgx, SGX, CLASS_CPU | CLASS_MEMORY),
+	STRESSOR(sgx_vm, SGX_VM, CLASS_MEMORY),
 	STRESSOR(shm, SHM_POSIX, CLASS_VM | CLASS_OS),
 	STRESSOR(shm_sysv, SHM_SYSV, CLASS_VM | CLASS_OS),
 	STRESSOR(sigfd, SIGFD, CLASS_INTERRUPT | CLASS_OS),
@@ -820,6 +823,12 @@ static const struct option long_options[] = {
 	{ "sgx",	1,	0,	OPT_SGX },
 	{ "sgx-ops",	1,	0,	OPT_SGX_OPS },
 	{ "sgx-method",	1,	0,	OPT_SGX_METHOD },
+	{ "sgx-vm",		1,	0,	OPT_SGX_VM },
+	{ "sgx-vm-bytes",	1,	0,	OPT_SGX_VM_BYTES },
+	{ "sgx-vm-hang",	1,	0,	OPT_SGX_VM_HANG },
+	{ "sgx-vm-keep",	0,	0,	OPT_SGX_VM_KEEP },
+	{ "sgx-vm-ops",	1,	0,	OPT_SGX_VM_OPS },
+	{ "sgx-vm-method",	1,	0,	OPT_SGX_VM_METHOD },
 	{ "shm",	1,	0,	OPT_SHM_POSIX },
 	{ "shm-ops",	1,	0,	OPT_SHM_POSIX_OPS },
 	{ "shm-bytes",	1,	0,	OPT_SHM_POSIX_BYTES },
@@ -1403,6 +1412,12 @@ static const help_t help_stressors[] = {
 	{ NULL,		"sgx N",			"start N SGX enclaves" },
 	{ NULL,		"sgx-ops N",		"stop after N sgx cpu bogo operations" },
 	{ NULL,		"sgx-method M",		"specify stress sgx method M, default is all" },
+	{ NULL,		"sgx-vm N",			"start N SGX enclaves spinning on trusted memory" },
+	{ NULL,		"sgx-vm-bytes N",		"allocate N bytes per vm worker (default 32MB)" },
+	{ NULL,		"sgx-vm-hang N",		"sleep N seconds before freeing memory" },
+	{ NULL,		"sgx-vm-keep",		"redirty memory instead of reallocating" },
+	{ NULL,		"sgx-vm-ops N",		"stop after N vm bogo operations" },
+	{ NULL,		"sgx-vm-method M",		"specify stress vm method M, default is all" },
 	{ NULL,		"shm N",		"start N workers that exercise POSIX shared memory" },
 	{ NULL,		"shm-ops N",		"stop after N POSIX shared memory bogo operations" },
 	{ NULL,		"shm-bytes N",		"allocate/free N bytes of POSIX shared memory" },
@@ -3323,6 +3338,19 @@ next_opt:
 			break;
 		case OPT_SGX_METHOD:
 			if (stress_set_sgx_method(optarg) < 0)
+				return EXIT_FAILURE;
+			break;
+		case OPT_SGX_VM_BYTES:
+			stress_set_sgx_vm_bytes(optarg);
+			break;
+		case OPT_SGX_VM_HANG:
+			stress_set_sgx_vm_hang(optarg);
+			break;
+		case OPT_SGX_VM_KEEP:
+			g_opt_flags |= OPT_FLAGS_SGX_VM_KEEP;
+			break;
+		case OPT_SGX_VM_METHOD:
+			if (stress_set_sgx_vm_method(optarg) < 0)
 				return EXIT_FAILURE;
 			break;
 		case OPT_SHM_POSIX_BYTES:

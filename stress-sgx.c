@@ -18,7 +18,7 @@
  */
 #include "stress-ng.h"
 #include "sgx/utils.h"
-#include "sgx/enclave_enclave/untrusted/enclave_u.h"
+#include "sgx/enclave_cpu/untrusted/enclave_u.h"
 
 typedef void (*stress_cpu_func)(const char *name);
 typedef struct {
@@ -35,6 +35,16 @@ int stress_sgx_supported(void)
 void ocall_pr_fail(const char* str)
 {
 	pr_fail(str);
+}
+
+void ocall_pr_err(const char* str)
+{
+	pr_err(str);
+}
+
+void ocall_pr_dbg(const char* str)
+{
+	pr_dbg(str);
 }
 
 uint64_t ocall_dummy(uint64_t param)
@@ -54,13 +64,13 @@ int stress_set_sgx_method(const char *name)
 	sgx_status_t status;
 
 	/* Initialize the enclave */
-	status = initialize_enclave(&eid);
+	status = initialize_enclave(&eid, ENCLAVE_CPU_FILENAME, TOKEN_CPU_FILENAME);
 	if (status != SGX_SUCCESS) {
 		printf("Error %d\n", status);
 		return -1;
 	}
 
-	status = ecall_method_exists(eid, &method_exists, name);
+	status = ecall_cpu_method_exists(eid, &method_exists, name);
 	if (status != SGX_SUCCESS) {
 		pr_fail("Unable to enter enclave, check SGX driver & PSW\n");
 		return -1;
@@ -75,7 +85,7 @@ int stress_set_sgx_method(const char *name)
 	char methods_error[bufsize];
 	memset(methods_error, '\0', bufsize);
 
-	status = ecall_get_methods_error(eid, methods_error, bufsize);
+	status = ecall_get_cpu_methods_error(eid, methods_error, bufsize);
 	if (status != SGX_SUCCESS) {
 		pr_fail("Unable to enter enclave, check SGX driver & PSW\n");
 		return -1;
@@ -100,7 +110,7 @@ int stress_sgx(const args_t *args)
 	sgx_status_t status = 0;
 
 	/* Initialize the enclave */
-	status = initialize_enclave(&eid);
+	status = initialize_enclave(&eid, ENCLAVE_CPU_FILENAME, TOKEN_CPU_FILENAME);
 	if (status != SGX_SUCCESS){
 		printf("Error %d\n", status);
 		return -1;
@@ -122,7 +132,7 @@ int stress_sgx(const args_t *args)
 	case 0:
 		return EXIT_SUCCESS;
 	case -1:
-		printf("Please set --cpu-method first\n");
+		printf("Please set --sgx-method first\n");
 	}
 
 	return EXIT_FAILURE;
