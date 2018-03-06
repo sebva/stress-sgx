@@ -81,4 +81,5 @@ It is possible to leverage this aspect to guarantee that both native and SGX ver
 This optional approach, however, limits Stress-SGX to stressors that are only available in enclave mode.
 
 Selecting the approach is done by compiling the version of Stress-SGX located in the `loadso` branch.
-Only CPU stressors are compatible with this option.
+CPU and VM stressors are compatible with this option.
+
