@@ -4,6 +4,9 @@ vm.so
         g_global_data_sim;
         g_global_data;
         vm_entry;
+        real_stress_vm;
+        real_vm_method_exists;
+        real_get_vm_methods_error;
     local:
         *;
 };

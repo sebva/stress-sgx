@@ -24,10 +24,6 @@
 #include <stdbool.h>
 
 
-bool* g_keep_stressing_flag;
-uint64_t g_opt_flags;
-
-
 /*
  *  the VM stress test has diffent methods of vm stressor
  */
@@ -40,6 +36,16 @@ typedef struct {
 } stress_vm_method_info_t;
 
 extern const stress_vm_method_info_t vm_methods[];
+
+int real_stress_vm(size_t vm_bytes, const char* method_name,
+		const uint64_t rounds, uint64_t * const counter,
+		bool* keep_stressing_flag, uint64_t opt_flags,
+		uint64_t *bit_error_count, size_t page_size, uint64_t vm_hang,
+		void* (*allocate_function)(size_t), void (*deallocate_function)(void*));
+
+int real_vm_method_exists(const char* method_name);
+
+void real_get_vm_methods_error(char* out_methods, int length);
 
 
 #endif /* ENCLAVE_VM_TRUSTED_STRESS_VM_H_ */

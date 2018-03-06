@@ -234,7 +234,7 @@ STRESS_SRC = \
 	stress-utime.c \
 	stress-vecmath.c \
 	stress-vforkmany.c \
-	stress-vm.c \
+	stress-vmso.c \
 	stress-vm-rw.c \
 	stress-vm-splice.c \
 	stress-wait.c \
@@ -303,7 +303,7 @@ endif
 
 CFLAGS += $(CONFIG_CFLAGS)
 CFLAGS += -I$(SGX_SDK)/include
-LDFLAGS += $(CONFIG_LDFLAGS) ./sgx/enclave_cpu/enclave_cpu.so
+LDFLAGS += $(CONFIG_LDFLAGS) ./sgx/enclave_cpu/enclave_cpu.so ./sgx/enclave_vm/enclave_vm.so
 ifneq ($(SGX_MODE), HW)
 	LDFLAGS += -L$(SGX_SDK)/lib64 -lsgx_urts_sim -lsgx_uae_service_sim
 else

@@ -65,7 +65,7 @@ Vm_Include_Paths := -IInclude -Itrusted -I$(SGX_SDK)/include -I$(SGX_SDK)/includ
 
 include ../../config
 Flags_Just_For_C := -Wno-implicit-function-declaration -std=gnu99
-Common_C_Cpp_Flags := $(SGX_COMMON_CFLAGS) $(CONFIG_CFLAGS) -nostdinc -fvisibility=hidden -fpie $(Vm_Include_Paths) -fno-builtin-printf -I.
+Common_C_Cpp_Flags := $(SGX_COMMON_CFLAGS) $(CONFIG_CFLAGS) -nostdinc -fpie $(Vm_Include_Paths) -fno-builtin-printf -I.
 Vm_C_Flags := $(Flags_Just_For_C) $(Common_C_Cpp_Flags)
 
 Vm_Link_Flags := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) \

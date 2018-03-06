@@ -63,6 +63,16 @@ int ecall_stress_vm(size_t vm_bytes, const char* method_name,
 		const uint64_t rounds, uint64_t * const counter,
 		bool* keep_stressing_flag, uint64_t opt_flags,
 		uint64_t *bit_error_count, size_t page_size, uint64_t vm_hang) {
+	return real_stress_vm(vm_bytes, method_name, rounds, counter, keep_stressing_flag,
+			opt_flags, bit_error_count, page_size, vm_hang,
+			&malloc, &free);
+}
+
+int real_stress_vm(size_t vm_bytes, const char* method_name,
+		const uint64_t rounds, uint64_t * const counter,
+		bool* keep_stressing_flag, uint64_t opt_flags,
+		uint64_t *bit_error_count, size_t page_size, uint64_t vm_hang,
+		void* (*allocate_function)(size_t), void (*deallocate_function)(void*)) {
 	uint8_t *buf = NULL;
 	int no_mem_retries = 0;
 	size_t buf_sz;
@@ -89,7 +99,7 @@ int ecall_stress_vm(size_t vm_bytes, const char* method_name,
 		if (!keep || (buf == NULL)) {
 			if (!g_keep_stressing_flag)
 				return EXIT_SUCCESS;
-			buf = (uint8_t *) malloc(buf_sz);
+			buf = (uint8_t *) ((*allocate_function)(buf_sz));
 			if (buf == NULL) {
 				no_mem_retries++;
 				int ret;
@@ -111,10 +121,18 @@ int ecall_stress_vm(size_t vm_bytes, const char* method_name,
 		}
 
 		if (!keep) {
-			free(buf);
+			(*deallocate_function)(buf);
 		}
 	} while (keep_stressing_vm(rounds, counter));
 
 	if (keep && buf != NULL)
-		free(buf);
+		(*deallocate_function)(buf);
+}
+
+int real_vm_method_exists(const char* method_name) {
+	return ecall_vm_method_exists(method_name);
+}
+
+void real_get_vm_methods_error(char* out_methods, int length) {
+	return ecall_get_vm_methods_error(out_methods, length);
 }

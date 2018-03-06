@@ -26,6 +26,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+_Bool* g_keep_stressing_flag;
+uint64_t g_opt_flags;
+
 #define OPTIMIZE3 	__attribute__((optimize("-O3")))
 
 #define HOT		__attribute__ ((hot))
