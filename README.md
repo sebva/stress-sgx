@@ -74,6 +74,25 @@ A key difference compared to _stress-ng_ is that we allocate memory using the _T
 all flip galpat-0 galpat-1 gray rowhammer incdec inc-nybble rand-set rand-sum read64 ror swap move-inv modulo-x prime-0 prime-1 prime-gray-0 prime-gray-1 prime-incdec walk-0d walk-1d walk-0a walk-1a write64 zero-one
 ```
 
+### Examples
+
+* Run a simple CPU stressor on 1 core for 30 seconds in an SGX enclave
+```bash
+./stress-ng --sgx 1 --sgx-method bitops -t 30
+```
+* Run all EPC stressors on 1 core, operating on 30 MB of EPC
+```bash
+./stress-ng --sgx-vm 1 --sgx-vm-bytes 30M
+```
+* Run the `fft` stressor on all CPU cores in an SGX enclave
+```bash
+./stress-ng --sgx 0 --sgx-method fft
+```
+* Run the `fft` stressor on all CPU cores in an SGX enclave and collect metrics after 10 seconds
+```bash
+./stress-ng -t 10 --sgx 0 --sgx-method fft --metrics
+```
+
 ## Ensuring byte-per-byte equivalence of native and SGX code
 
 An enclave compiled using the official SGX SDK will produce a statically-compiled shared library.
@@ -81,4 +100,5 @@ It is possible to leverage this aspect to guarantee that both native and SGX ver
 This optional approach, however, limits Stress-SGX to stressors that are only available in enclave mode.
 
 Selecting the approach is done by compiling the version of Stress-SGX located in the `loadso` branch.
-Only CPU stressors are compatible with this option.
+CPU and VM stressors are compatible with this option.
+
