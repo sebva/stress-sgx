@@ -436,7 +436,7 @@ ofd_lock_abort:	{ /* Nowt */ }
 #endif
 		};
 
-		ret = fcntl(fd, F_GET_FILE_RW_HINT, &hint);
+		int ret = fcntl(fd, F_GET_FILE_RW_HINT, &hint);
 		if (ret == 0) {
 			for (i = 0; i < SIZEOF_ARRAY(hints); i++) {
 				hint = hints[i];
