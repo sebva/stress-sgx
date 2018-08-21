@@ -83,7 +83,7 @@ static const int madvise_options[] = {
 	MADV_FREE,
 #endif
 #if defined(MADV_HWPOISON)
-	MADV_HWPOISON
+	MADV_HWPOISON,
 #endif
 #if defined(MADV_WIPEONFORK)
 	MADV_WIPEONFORK
